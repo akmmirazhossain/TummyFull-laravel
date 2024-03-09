@@ -42,6 +42,9 @@ Route::get('/setting', [SettingController::class, 'index']);
 
 use App\Http\Controllers\PhoneVerificationController;
 
-//Route::post('/verify-phone', [PhoneVerificationController::class, 'sendOtp']);
-Route::get('/send-otp', [PhoneVerificationController::class, 'verifyPhoneNumber']);
-// Route::post('/send-otp', [PhoneVerificationController::class, 'verifyOtp']);
+Route::post('/send-otp', [PhoneVerificationController::class, 'verifyPhoneNumber']);
+Route::post('/verify-otp', [PhoneVerificationController::class, 'verifyOtp']);
+
+use App\Http\Controllers\SmsTestController;
+
+Route::get('/test-otp', [SmsTestController::class, 'sendSms']);
