@@ -158,4 +158,48 @@ class MenuController extends Controller
 
         return $daysOfWeek[$nextIndex];
     }
+
+    public function getMenuById($menuId)
+{
+    $meals = MenuMod::with('food')->get();
+
+    $result = [];
+
+    foreach ($meals as $meal) {
+        if ($meal->mrd_menu_id == $menuId) {
+            $foodIds = explode(',', $meal->mrd_menu_food_id);
+
+            foreach ($foodIds as $foodId) {
+                $food = FoodMod::where('mrd_food_id', $foodId)->first();
+
+                if ($food) {
+                    $mealData = [
+                        'food_name' => $food->mrd_food_name,
+                        'food_image' => $food->mrd_food_img,
+                    ];
+
+                    if ($meal->mrd_menu_period === 'lunch') {
+                        $result['lunch'][] = $mealData;
+                        $result['menu_id_lunch'] = $meal->mrd_menu_id;
+                        $result['menu_price_lunch'] = $meal->mrd_menu_price;
+                        $result['menu_active_lunch'] = 'yes';
+                    } elseif ($meal->mrd_menu_period === 'dinner') {
+                        $result['dinner'][] = $mealData;
+                        $result['menu_id_dinner'] = $meal->mrd_menu_id;
+                        $result['menu_price_dinner'] = $meal->mrd_menu_price;
+                        $result['menu_active_dinner'] = 'yes';
+                    }
+                }
+            }
+
+            break; // Stop the loop once the menu with the provided ID is found
+        }
+    }
+
+    return response()->json($result);
+}
+
+
+
+
 }

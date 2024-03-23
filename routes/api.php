@@ -28,15 +28,13 @@ Route::get('items', [ApiController::class, 'getItems']);
 // routes/api.php
 
 use App\Http\Controllers\MenuController;
-
 Route::get('/menu', [MenuController::class, 'index']);
-
+Route::get('/menu/{menuId}', [MenuController::class, 'getMenuById']);
 // use Illuminate\Http\Request;
 // Route::get('/mrdtest', [MrdTest::class, 'index']);
 
 // Route for MrdSettingController
 use App\Http\Controllers\SettingController;
-
 Route::get('/setting', [SettingController::class, 'index']);
 
 
