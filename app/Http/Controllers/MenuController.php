@@ -5,148 +5,189 @@ namespace App\Http\Controllers;
 use App\Models\FoodMod;
 use App\Models\MenuMod;
 use App\Models\SettingMod;
+use Illuminate\Http\Request;
+
+use App\Models\OrderMod;
+
 
 class MenuController extends Controller
 {
-    public function index()
+
+    public function __construct()
     {
+        // Disable CORS middleware for all methods in this controller
+        $this->middleware(function ($request, $next) {
+            $response = $next($request);
+            $response->header('Access-Control-Allow-Origin', '*');
+            $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+            $response->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Requested-With');
+            return $response;
+        });
+    }
+
+    public function index(Request $request)
+    {
+        $TFLoginToken = $request->query('TFLoginToken');
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+
+
+        //MARK: Date calc
         $currentDay = strtolower(date('D'));
-        //$currentTime = date('H:i a');
         $currentTimeUnix = time();
         $currentDate = date('Y-m-d');
         $dayStartUnix = strtotime($currentDate . ' ' . '00:00');
         $nextDayUnix = $dayStartUnix + (24 * 60 * 60);
 
-        //dd($currentDate.' '. $currentTime);
-
         $mrdSetting = SettingMod::first();
-
         $limitLunch = $mrdSetting->mrd_setting_time_limit_lunch;
         $limitDinner = $mrdSetting->mrd_setting_time_limit_dinner;
 
-//dd($limitLunch);
+        $limitDinnerUnix = strtotime($currentDate . ' ' . $limitDinner);
+        $limitLunchUnix = strtotime($currentDate . ' ' . $limitLunch);
 
-        $limitDinnerUnix = $currentDate . ' ' . $limitDinner;
-        $limitDinnerUnix = strtotime($limitDinnerUnix);
-
-        $limitLunchUnix = $currentDate . ' ' . $limitLunch;
-        $limitLunchUnix = strtotime($limitLunchUnix);
-
-        // Check if the current time is after the time_limit_dinner
         if ($currentTimeUnix > $limitDinnerUnix) {
-            // If it is, get the next day
             $currentDay = $this->getNextDay($currentDay);
         }
 
         $nextDay = $this->getNextDay($currentDay);
-
         $daysOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
         $currentDayIndex = array_search($currentDay, $daysOfWeek);
 
         $startIndex = $currentDayIndex;
-
         $sortedDays = array_merge(
             array_slice($daysOfWeek, $startIndex),
             array_slice($daysOfWeek, 0, $startIndex)
         );
 
-        $meals = MenuMod::with('food')->get();
+        $result = [];
+        $currentIndex = 0;
+        $tomorrowTaken = 0;
+        $tomorrow2Taken = 0;
+
+
+
 
         $result = [];
 
-        foreach ($meals as $meal) {
-            $foodIds = explode(',', $meal->mrd_menu_food_id);
-            $menuId = $meal->mrd_menu_id;
-
-            $addedMenuInfoForLunch = false;
-            $addedMenuInfoForDinner = false;
-
-            foreach ($foodIds as $foodId) {
-                $food = FoodMod::where('mrd_food_id', $foodId)->first();
-
-                if ($food) {
-                    $mealData = [
-                        'food_name' => $food->mrd_food_name,
-                        'food_image' => $food->mrd_food_img,
-                    ];
-
-                    if ($meal->mrd_menu_period === 'lunch') {
-                        $result[$meal->mrd_menu_day][$meal->mrd_menu_period][] = $mealData;
-                    } elseif ($meal->mrd_menu_period === 'dinner') {
-                        $result[$meal->mrd_menu_day][$meal->mrd_menu_period][] = $mealData;
-                    }
-
-                    if (!$addedMenuInfoForLunch && $meal->mrd_menu_period === 'lunch') {
-                        $result[$meal->mrd_menu_day]['menu_id_lunch'] = $menuId;
-                        $result[$meal->mrd_menu_day]['menu_price_lunch'] = $meal->mrd_menu_price;
-                        if (($currentTimeUnix > $limitLunchUnix) && ($currentTimeUnix < $limitDinnerUnix)) {
-                            $result[$meal->mrd_menu_day]['menu_active_lunch'] = 'no';
-                        } else {
-                            $result[$meal->mrd_menu_day]['menu_active_lunch'] = 'yes';
-                        }
-
-                        $addedMenuInfoForLunch = true;
-                    } elseif (!$addedMenuInfoForDinner && $meal->mrd_menu_period === 'dinner') {
-                        $result[$meal->mrd_menu_day]['menu_id_dinner'] = $menuId;
-                        $result[$meal->mrd_menu_day]['menu_price_dinner'] = $meal->mrd_menu_price;
-                        $result[$meal->mrd_menu_day]['menu_active_dinner'] = 'yes';
-                        $addedMenuInfoForDinner = true;
-                    }
-                }
-            }
-        }
-
-        $output = [];
-
-        $currentIndex = 0;
-        $tomorrowTaken = 0;
-
         foreach ($sortedDays as $day) {
-            $date = date('jS M', strtotime("+$currentIndex days"));
+
+
+
+
             $nextMenuText = '';
+            $dayData = [];
 
-            // if (($currentTimeUnix > $dayStartUnix) && ($currentTimeUnix < $limitDinnerUnix)) {
 
-            //     $nextMenuText = "Today's menu";
-
-            // } elseif (($currentTimeUnix > $limitDinnerUnix) && ($currentTimeUnix < $nextDayUnix)) {
-            //     $nextMenuText = "Tomorrow's menu";
-            // } else {
-            //     $nextMenuText = "Menu of";
-            // }
 
             if (($day === $currentDay) && ($currentTimeUnix < $limitDinnerUnix)) {
-
                 $nextMenuText = "Today's menu";
-
+                $date = date('Y-m-d', strtotime("+$currentIndex days"));
             } elseif (($day === $currentDay) && ($currentTimeUnix < $nextDayUnix)) {
-                $nextMenuText = "Tomorrow's menu 1";
+                $nextMenuText = "Tomorrow's menu (on currentday)";
                 $tomorrowTaken = 1;
+                $date = date('Y-m-d', strtotime(" +1 day"));
             } elseif (($day === $nextDay) && ($tomorrowTaken != 1)) {
-                $nextMenuText = "Tomorrow's menu 2";
+                $nextMenuText = "Tomorrow's menu (tomorrow)";
+                $tomorrow2Taken = 1;
+                $date = date('Y-m-d', strtotime(" +1 day"));
             } else {
                 $nextMenuText = "Menu of";
+                if ($tomorrowTaken == 1) {
+                    $date = date('Y-m-d', strtotime("tomorrow + $currentIndex days"));
+                } elseif ($tomorrow2Taken == 1) {
+                    $date = date('Y-m-d', strtotime(" +$currentIndex days"));
+                }
             }
 
-            $result[$day]['date'] = $date;
-            $result[$day]['menu_of'] = $nextMenuText;
-            //$result[$day]['menu_active_lunch'] = (($currentTime > $limitLunch) && ($day === $currentDay)) ? 'no (L2)' : 'yes (L2)';
+            $dayData['date'] = $date;
+            $dayData['menu_of'] = $nextMenuText;
 
-            // Check if the current time is after the time_limit_lunch
-            if (($currentTimeUnix > $limitLunchUnix) && ($currentTimeUnix < $limitDinnerUnix) && ($day === $currentDay)) {
+            $currentIndex++;
 
-                $result[$day]['menu_active_lunch'] = 'no';
-            } else {
-                // If the current time is not after the time_limit_lunch, set 'menu_active_lunch' to 'yes (L2)'
-                $result[$day]['menu_active_lunch'] = 'yes';
+            // Get all menu items for the current day
+            $menus = MenuMod::where('mrd_menu_day', $day)->get();
+
+
+
+            foreach ($menus as $menu) {
+                // Get the list of food IDs from mrd_menu_food_id and remove trailing commas
+                $foodIds = array_filter(explode(',', $menu->mrd_menu_food_id));
+
+                $foods = FoodMod::whereIn('mrd_food_id', $foodIds)->get();
+
+                $foodDataList = $foods->map(function ($food) {
+                    return [
+                        'food_name' => $food->mrd_food_name,
+                        'food_image' => $food->mrd_food_img
+                    ];
+                });
+                $foodData = [
+                    'foods' => $foodDataList,
+
+                    'price' => $menu->mrd_menu_price,
+                ];
+
+                // Assign appropriate ID based on the meal period
+                if ($menu->mrd_menu_period === 'lunch') {
+
+                    if ($day == $currentDay) {
+
+
+                        if ($currentTimeUnix < $limitLunchUnix) {
+
+                            // Check if the order exists for lunch
+                            $foodData['id'] = $menu->mrd_menu_id;
+                            $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                            $foodData['status'] = $status;
+                            // Get the quantity for lunch and add it to food data
+                            $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                            $foodData['quantity'] = $quantity;
+                            $dayData['lunch'] = $foodData;
+                        }
+
+
+                        if (($currentTimeUnix > $limitLunchUnix) && ($currentTimeUnix > $limitDinnerUnix)) {
+
+                            // Check if the order exists for lunch
+                            $foodData['id'] = $menu->mrd_menu_id;
+                            $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                            $foodData['status'] = $status;
+                            // Get the quantity for lunch and add it to food data
+                            $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                            $foodData['quantity'] = $quantity;
+                            $dayData['lunch'] = $foodData;
+                        }
+                    } else {
+
+                        // Check if the order exists for lunch
+                        $foodData['id'] = $menu->mrd_menu_id;
+                        $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                        $foodData['status'] = $status;
+                        // Get the quantity for lunch and add it to food data
+                        $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                        $foodData['quantity'] = $quantity;
+                        $dayData['lunch'] = $foodData;
+                    }
+                } elseif ($menu->mrd_menu_period === 'dinner') {
+                    $foodData['id'] = $menu->mrd_menu_id;
+
+
+                    // Check if the order exists for dinner
+                    $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                    $foodData['status'] = $status;
+                    // Get the quantity for dinner and add it to food data
+                    $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                    $foodData['quantity'] = $quantity;
+
+                    $dayData['dinner'] = $foodData;
+                }
             }
 
-            $output[$day] = $result[$day];
-
-            $currentIndex++; // Increment for the next day
+            $result[$day] = $dayData;
         }
 
-        return response()->json($output);
+        // Print the result
+        return response()->json($result);
     }
 
     private function getNextDay($currentDay)
@@ -159,47 +200,73 @@ class MenuController extends Controller
         return $daysOfWeek[$nextIndex];
     }
 
-    public function getMenuById($menuId)
-{
-    $meals = MenuMod::with('food')->get();
 
-    $result = [];
+    public  function getOrderStatus($userId, $menuId, $date, $status)
+    {
+        // Check if the order exists
+        $orderExistance = OrderMod::where('mrd_order_user_id', $userId)
+            ->where('mrd_order_menu_id', $menuId)
+            ->where('mrd_order_date', $date)
+            ->where('mrd_order_status', $status)
+            ->exists();
 
-    foreach ($meals as $meal) {
-        if ($meal->mrd_menu_id == $menuId) {
-            $foodIds = explode(',', $meal->mrd_menu_food_id);
-
-            foreach ($foodIds as $foodId) {
-                $food = FoodMod::where('mrd_food_id', $foodId)->first();
-
-                if ($food) {
-                    $mealData = [
-                        'food_name' => $food->mrd_food_name,
-                        'food_image' => $food->mrd_food_img,
-                    ];
-
-                    if ($meal->mrd_menu_period === 'lunch') {
-                        $result['lunch'][] = $mealData;
-                        $result['menu_id_lunch'] = $meal->mrd_menu_id;
-                        $result['menu_price_lunch'] = $meal->mrd_menu_price;
-                        $result['menu_active_lunch'] = 'yes';
-                    } elseif ($meal->mrd_menu_period === 'dinner') {
-                        $result['dinner'][] = $mealData;
-                        $result['menu_id_dinner'] = $meal->mrd_menu_id;
-                        $result['menu_price_dinner'] = $meal->mrd_menu_price;
-                        $result['menu_active_dinner'] = 'yes';
-                    }
-                }
-            }
-
-            break; // Stop the loop once the menu with the provided ID is found
-        }
+        return $orderExistance ? 'enabled' : 'disabled';
     }
 
-    return response()->json($result);
-}
+    private function getQuantity($userId, $menuId, $date)
+    {
+        // Retrieve the order and get the quantity
+        $order = OrderMod::where('mrd_order_user_id', $userId)
+            ->where('mrd_order_menu_id', $menuId)
+            ->where('mrd_order_date', $date)
+            ->first();
+
+        // Return the quantity if order exists, otherwise return 0
+        return $order ? $order->mrd_order_quantity : 0;
+    }
+
+    public function getMenuById($menuId)
+    {
+        $meals = MenuMod::with('food')->get();
+
+        $result = [];
+
+        foreach ($meals as $meal) {
+            if ($meal->mrd_menu_id == $menuId) {
+                $foodIds = explode(',', $meal->mrd_menu_food_id);
+
+                foreach ($foodIds as $foodId) {
+                    $food = FoodMod::where('mrd_food_id', $foodId)->first();
+
+                    if ($food) {
+                        $mealData = [
+                            'food_name' => $food->mrd_food_name,
+                            'food_image' => $food->mrd_food_img,
+                        ];
+
+                        if ($meal->mrd_menu_period === 'lunch') {
+                            $result['lunch'][] = $mealData;
+                            $result['meal_type'] = $meal->mrd_menu_period;
+                            $result['menu_id_lunch'] = $meal->mrd_menu_id;
+                            $result['menu_price_lunch'] = $meal->mrd_menu_price;
+                            $result['menu_active_lunch'] = 'yes';
+                            $result['menu_day_lunch'] = $meal->mrd_menu_day;
+                        } elseif ($meal->mrd_menu_period === 'dinner') {
+                            $result['dinner'][] = $mealData;
+                            $result['meal_type'] = $meal->mrd_menu_period;
+                            $result['menu_id_dinner'] = $meal->mrd_menu_id;
+                            $result['menu_price_dinner'] = $meal->mrd_menu_price;
+                            $result['menu_active_dinner'] = 'yes';
+                            $result['menu_day_dinner'] = $meal->mrd_menu_day;
+                        }
+                    }
+                }
+
+                break; // Stop the loop once the menu with the provided ID is found
+            }
+        }
 
 
-
-
+        return response()->json($result);
+    }
 }

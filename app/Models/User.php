@@ -13,16 +13,7 @@ class User extends Authenticatable
     protected $primaryKey = 'mrd_user_id';
     protected $table = 'mrd_user';
 
-//     public function getAuthPassword()
-// {
-//     return $this->a_password;
-// }
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'mrd_user_id',
         'mrd_user_group_id',
@@ -36,6 +27,7 @@ class User extends Authenticatable
         'mrd_user_address',
         'mrd_user_payment_phone',
         'mrd_user_status',
+        'mrd_user_mealbox',
         'mrd_user_total_meal',
         'mrd_user_delivery_ask',
         'mrd_user_meal_size',
@@ -44,21 +36,13 @@ class User extends Authenticatable
         'mrd_user_date_added',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
+
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
+
     protected $casts = [
         'email_verified_at' => 'datetime',
         'mrd_user_password' => 'hashed',
