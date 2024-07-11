@@ -13,9 +13,10 @@ class DeliveryController extends Controller
     {
 
         // Set the variables for date criteria and order status
-        $orderlistof = "today"; // Default to 'alltime' if not provided
-        $orderstatus = "pending"; // Default to null if not provided
-        $orderperiod = "dinner";
+        $orderlistof = "todayafter"; // Default to 'alltime' if not provided
+        $orderstatus = "all";
+        $orderperiod = "all";
+        $orderarea = "all";
 
         // Get the current date
         $today = Carbon::now()->format('Y-m-d');
@@ -24,6 +25,7 @@ class DeliveryController extends Controller
         $ordersQuery = DB::table('mrd_order')
             ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
             ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+            ->join('mrd_area', 'mrd_user.mrd_user_area', '=', 'mrd_area.mrd_area_id')
             ->select(
                 'mrd_menu.mrd_menu_period',
                 'mrd_menu.mrd_menu_id',
@@ -34,10 +36,15 @@ class DeliveryController extends Controller
                 'mrd_user.mrd_user_first_name',
                 'mrd_user.mrd_user_delivery_instruction',
                 'mrd_order.mrd_order_status',
+                'mrd_area.mrd_area_name'
 
             )
             ->orderBy('mrd_order.mrd_order_date', 'asc');
 
+
+        if ($orderarea !== "all") {
+            $ordersQuery->where('mrd_area.mrd_area_id', '=', $orderarea);
+        }
 
         if ($orderperiod !== "all") {
             $ordersQuery->where('mrd_menu.mrd_menu_period', '=', $orderperiod);
@@ -51,7 +58,7 @@ class DeliveryController extends Controller
         }
 
         // Modify query based on the value of $orderstatus
-        if ($orderstatus) {
+        if ($orderstatus !== "all") {
             $ordersQuery->where('mrd_order.mrd_order_status', '=', $orderstatus);
         }
 
@@ -65,7 +72,13 @@ class DeliveryController extends Controller
             $date = $order->mrd_order_date;
             $period = $order->mrd_menu_period;
 
+
             // Check if the date key exists in $groupedOrders, if not, initialize it as an empty array
+            if (!isset($groupedOrders[$date])) {
+                $groupedOrders[$date] = [];
+            }
+
+
             if (!isset($groupedOrders[$date])) {
                 $groupedOrders[$date] = [];
             }
@@ -81,13 +94,7 @@ class DeliveryController extends Controller
 
 
 
-
-        // Encode the grouped orders into JSON format
-        $json = json_encode($groupedOrders, JSON_PRETTY_PRINT);
-
-        // Output JSON
-        header('Content-Type: application/json');
-        echo $json;
+        return response()->json($groupedOrders);
     }
 
     //MARK: DeliveryLater

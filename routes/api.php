@@ -64,6 +64,7 @@ use App\Http\Controllers\OrderController;
 
 Route::post('/order-place', [OrderController::class, 'orderPlace']);
 Route::post('/quantity-changer', [OrderController::class, 'quantityChanger']);
+Route::post('/mealbox-status', [OrderController::class, 'mealboxStatApi']);
 
 
 
@@ -89,3 +90,8 @@ Route::get('/orderlist-chef-test', [ChefController::class, 'orderListChefTest'])
 use App\Http\Controllers\DeliveryController;
 
 Route::get('/delivery', [DeliveryController::class, 'deliveryList']);
+
+
+use App\Http\Controllers\NotificationController;
+
+Route::post('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);

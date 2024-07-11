@@ -13,6 +13,7 @@ use Exception;
 
 class OrderController extends Controller
 {
+    //MARK: PLACE ORDER
     public function orderPlace(Request $request)
     {
 
@@ -167,12 +168,29 @@ class OrderController extends Controller
         }
     }
 
-    //MARK: Mealbox stat
+    //MARK: Mbox stat
     public function getUserMealboxById($id)
     {
         // Execute the query to fetch the mrd_user_mealbox value
         $mealboxValue = DB::table('mrd_user')
             ->where('mrd_user_id', $id)
+            ->value('mrd_user_mealbox');
+
+        return $mealboxValue;
+    }
+
+    //MARK: Mbox Stat API
+    public function mealboxStatApi(Request $request)
+    {
+
+        $TFLoginToken = $request->input('TFLoginToken');
+
+        // Fetch user ID based on session token
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
+        // Execute the query to fetch the mrd_user_mealbox value
+        $mealboxValue = DB::table('mrd_user')
+            ->where('mrd_user_id', $userId)
             ->value('mrd_user_mealbox');
 
         return $mealboxValue;

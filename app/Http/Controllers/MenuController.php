@@ -6,7 +6,7 @@ use App\Models\FoodMod;
 use App\Models\MenuMod;
 use App\Models\SettingMod;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\DB;
 use App\Models\OrderMod;
 
 
@@ -83,11 +83,11 @@ class MenuController extends Controller
                 $nextMenuText = "Today's menu";
                 $date = date('Y-m-d', strtotime("+$currentIndex days"));
             } elseif (($day === $currentDay) && ($currentTimeUnix < $nextDayUnix)) {
-                $nextMenuText = "Tomorrow's menu (on currentday)";
+                $nextMenuText = "Tomorrow's menu ";
                 $tomorrowTaken = 1;
                 $date = date('Y-m-d', strtotime(" +1 day"));
             } elseif (($day === $nextDay) && ($tomorrowTaken != 1)) {
-                $nextMenuText = "Tomorrow's menu (tomorrow)";
+                $nextMenuText = "Tomorrow's menu ";
                 $tomorrow2Taken = 1;
                 $date = date('Y-m-d', strtotime(" +1 day"));
             } else {
@@ -142,6 +142,9 @@ class MenuController extends Controller
                             // Get the quantity for lunch and add it to food data
                             $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
+
+                            $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                            $foodData['mealbox'] = $mealboxStatus;
                             $dayData['lunch'] = $foodData;
                         }
 
@@ -155,6 +158,8 @@ class MenuController extends Controller
                             // Get the quantity for lunch and add it to food data
                             $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
+                            $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                            $foodData['mealbox'] = $mealboxStatus;
                             $dayData['lunch'] = $foodData;
                         }
                     } else {
@@ -166,6 +171,8 @@ class MenuController extends Controller
                         // Get the quantity for lunch and add it to food data
                         $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                         $foodData['quantity'] = $quantity;
+                        $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                        $foodData['mealbox'] = $mealboxStatus;
                         $dayData['lunch'] = $foodData;
                     }
                 } elseif ($menu->mrd_menu_period === 'dinner') {
@@ -178,7 +185,8 @@ class MenuController extends Controller
                     // Get the quantity for dinner and add it to food data
                     $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                     $foodData['quantity'] = $quantity;
-
+                    $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                    $foodData['mealbox'] = $mealboxStatus;
                     $dayData['dinner'] = $foodData;
                 }
             }
@@ -213,6 +221,19 @@ class MenuController extends Controller
         return $orderExistance ? 'enabled' : 'disabled';
     }
 
+    public function getMealboxStatus($userId, $menuId, $date)
+    {
+        // Query to retrieve mrd_order_status using DB facade
+        $mealboxStatus = DB::table('mrd_order')
+            ->where('mrd_order_user_id', $userId)
+            ->where('mrd_order_menu_id', $menuId)
+            ->where('mrd_order_date', $date)
+            ->value('mrd_order_mealbox');
+
+        return $mealboxStatus;
+    }
+
+
     private function getQuantity($userId, $menuId, $date)
     {
         // Retrieve the order and get the quantity
@@ -225,48 +246,13 @@ class MenuController extends Controller
         return $order ? $order->mrd_order_quantity : 0;
     }
 
-    public function getMenuById($menuId)
+
+    private function getMenuPeriod($menuId)
     {
-        $meals = MenuMod::with('food')->get();
+        $menuPeriod = DB::table('mrd_menu')
+            ->where('mrd_menu_id', $menuId)
+            ->value('mrd_menu_period');
 
-        $result = [];
-
-        foreach ($meals as $meal) {
-            if ($meal->mrd_menu_id == $menuId) {
-                $foodIds = explode(',', $meal->mrd_menu_food_id);
-
-                foreach ($foodIds as $foodId) {
-                    $food = FoodMod::where('mrd_food_id', $foodId)->first();
-
-                    if ($food) {
-                        $mealData = [
-                            'food_name' => $food->mrd_food_name,
-                            'food_image' => $food->mrd_food_img,
-                        ];
-
-                        if ($meal->mrd_menu_period === 'lunch') {
-                            $result['lunch'][] = $mealData;
-                            $result['meal_type'] = $meal->mrd_menu_period;
-                            $result['menu_id_lunch'] = $meal->mrd_menu_id;
-                            $result['menu_price_lunch'] = $meal->mrd_menu_price;
-                            $result['menu_active_lunch'] = 'yes';
-                            $result['menu_day_lunch'] = $meal->mrd_menu_day;
-                        } elseif ($meal->mrd_menu_period === 'dinner') {
-                            $result['dinner'][] = $mealData;
-                            $result['meal_type'] = $meal->mrd_menu_period;
-                            $result['menu_id_dinner'] = $meal->mrd_menu_id;
-                            $result['menu_price_dinner'] = $meal->mrd_menu_price;
-                            $result['menu_active_dinner'] = 'yes';
-                            $result['menu_day_dinner'] = $meal->mrd_menu_day;
-                        }
-                    }
-                }
-
-                break; // Stop the loop once the menu with the provided ID is found
-            }
-        }
-
-
-        return response()->json($result);
+        echo $menuPeriod;
     }
 }

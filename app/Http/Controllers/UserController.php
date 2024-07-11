@@ -51,7 +51,7 @@ class UserController extends Controller
                 'address' => $user->mrd_user_address,
                 'email' => $user->mrd_user_email,
                 'mrd_user_mealbox' => $user->mrd_user_mealbox,
-                'delivery_message' => $user->mrd_user_delivery_ask, // Assuming this maps correctly to 'delivery_message'
+                'delivery_instruction' => $user->mrd_user_delivery_instruction, // Assuming this maps correctly to 'delivery_message'
                 'meal_size' => $user->mrd_user_meal_size,
             ],
         ]);
@@ -65,6 +65,7 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
+            'delivery_instruction' => 'nullable|string|max:500',
         ]);
 
         // Extract the token from the Authorization header
@@ -92,6 +93,7 @@ class UserController extends Controller
         // Update the user's name and address
         $user->mrd_user_first_name = $request->input('name');
         $user->mrd_user_address = $request->input('address');
+        $user->mrd_user_delivery_instruction = $request->input('delivery_instruction');
         $user->save();
 
         // Return a JSON response with the updated user information

@@ -82,6 +82,16 @@ class SettingController extends Controller
                 "mrd_user_mealbox" => $switchValue,
             ]);
 
+
+        // Get the current date
+        $today = Carbon::today()->toDateString();
+
+        // Perform the update using Laravel's DB facade
+        $update = DB::table('mrd_order')
+            ->where('mrd_order_user_id', $userId)
+            ->whereDate('mrd_order_date', '>', $today)
+            ->update(['mrd_order_mealbox' => $switchValue]);
+
         // Check if a row exists
         $exists = DB::table('mrd_delivery')
             ->where('mrd_delivery_user_id', $userId)
