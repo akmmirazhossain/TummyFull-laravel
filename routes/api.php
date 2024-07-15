@@ -35,10 +35,6 @@ Route::get('/menu', [MenuController::class, 'index']);
 Route::get('/menu/{menuId}', [MenuController::class, 'getMenuById']);
 
 
-
-// use Illuminate\Http\Request;
-// Route::get('/mrdtest', [MrdTest::class, 'index']);
-
 // Route for MrdSettingController
 use App\Http\Controllers\SettingController;
 
@@ -50,14 +46,6 @@ use App\Http\Controllers\PhoneVerificationController;
 
 Route::post('/send-otp', [PhoneVerificationController::class, 'verifyPhoneNumber']);
 Route::post('/verify-otp', [PhoneVerificationController::class, 'verifyOtp']);
-
-
-
-
-// use App\Http\Controllers\OrderAuto;
-
-// Route::get('/orderauto', [OrderAuto::class, 'index']);
-// Route::get('/item/{id}', [OrderAuto::class, 'show']);
 
 
 use App\Http\Controllers\OrderController;
@@ -90,8 +78,10 @@ Route::get('/orderlist-chef-test', [ChefController::class, 'orderListChefTest'])
 use App\Http\Controllers\DeliveryController;
 
 Route::get('/delivery', [DeliveryController::class, 'deliveryList']);
+Route::get('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
 
 
 use App\Http\Controllers\NotificationController;
 
 Route::post('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
+Route::get('/notif-get', [NotificationController::class, 'notifGet']);

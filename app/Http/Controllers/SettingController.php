@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+
 class SettingController extends Controller
 {
     //MARK: SERVER SETT
@@ -68,7 +69,7 @@ class SettingController extends Controller
         return response()->json($output);
     }
 
-    //MARK: MEALBOX
+    //MARK: MEALBOX STATUS UPDATER
     public function mealboxSwitch(Request $request)
     {
         $switchValue = $request->input("switchValue");
@@ -82,6 +83,10 @@ class SettingController extends Controller
                 "mrd_user_mealbox" => $switchValue,
             ]);
 
+
+
+        $NotificationController = new NotificationController();
+        $orderExistance = $NotificationController->notifMealbox($userId, $switchValue);
 
         // Get the current date
         $today = Carbon::today()->toDateString();

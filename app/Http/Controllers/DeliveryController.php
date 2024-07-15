@@ -29,13 +29,17 @@ class DeliveryController extends Controller
             ->select(
                 'mrd_menu.mrd_menu_period',
                 'mrd_menu.mrd_menu_id',
+                'mrd_order.mrd_order_id',
                 'mrd_order.mrd_order_date',
+                'mrd_order.mrd_order_quantity',
+                'mrd_order.mrd_order_total_price',
                 'mrd_order.mrd_order_mealbox',
+                'mrd_order.mrd_order_status',
+                'mrd_user.mrd_user_id',
                 'mrd_user.mrd_user_address',
                 'mrd_user.mrd_user_phone',
                 'mrd_user.mrd_user_first_name',
                 'mrd_user.mrd_user_delivery_instruction',
-                'mrd_order.mrd_order_status',
                 'mrd_area.mrd_area_name'
 
             )
@@ -79,10 +83,6 @@ class DeliveryController extends Controller
             }
 
 
-            if (!isset($groupedOrders[$date])) {
-                $groupedOrders[$date] = [];
-            }
-
             // Check if the period key exists in $groupedOrders[$date], if not, initialize it as an empty array
             if (!isset($groupedOrders[$date][$period])) {
                 $groupedOrders[$date][$period] = [];
@@ -98,7 +98,85 @@ class DeliveryController extends Controller
     }
 
     //MARK: DeliveryLater
-    public function orderListChefLater()
+    public function deliveryUpdate(Request $request)
     {
+
+        $delivStatus = $request->input('delivStatus');
+        $orderId = $request->input('orderId');
+        $userId = $request->input('userId');
+        $mealPeriod = $request->input('mealType');
+        $menuId = $request->input('menuId');
+
+
+        // Fetch user ID based on session token
+
+
+
+        $userCredit = DB::table('mrd_user')
+            ->where('mrd_user_id', $userId)
+            ->value('mrd_user_credit');
+
+        $orderTotalPrice = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
+            ->value('mrd_order_total_price');
+
+
+        $orderQuantity = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
+            ->value('mrd_order_quantity');
+
+        $menuPeriod = DB::table('mrd_menu')
+            ->where('mrd_menu_id', $menuId)
+            ->value('mrd_menu_period');
+
+
+
+        // $formattedDate = Carbon::parse($date)->format('F j (l)');
+
+
+
+        if ($delivStatus == 'delivered') {
+            $notif_message =  "Your " . $menuPeriod . " has been delivered. Quantity (" . $orderQuantity . ")";
+            $userCreditNew = $userCredit - $orderTotalPrice;
+            $notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
+
+            $userCreditUpdate = DB::table('mrd_user')
+                ->where('mrd_user_id', $userId)
+                ->update(['mrd_user_credit' => $userCreditNew]);
+        } elseif ($delivStatus == 'cancelled') {
+            $notif_message =  "Your " . $menuPeriod . " was canceled.";
+            $notif_credit_calc =
+                null;
+        } elseif ($delivStatus == 'unavailable') {
+            $notif_message =  "Unable to deliver your " . $menuPeriod . " due to unavailability.";
+            $notif_credit_calc =
+                null;
+        }
+
+
+
+
+        $notifInsert = DB::table('mrd_notification')->insert([
+            'mrd_notif_user_id' =>
+            $userId,
+            'mrd_notif_message' => $notif_message,
+            'mrd_notif_credit_calc' => $notif_credit_calc,
+            'mrd_notif_type' => 'order'
+        ]);
+
+
+        $delivUpdate = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
+            ->update(['mrd_order_status' => $delivStatus]);
+
+
+        return response()->json([
+            'success' => true,
+            'delivStatus' => $delivStatus,
+            'orderId' => $orderId,
+            'userId' => $userId,
+            'mealPeriod' => $mealPeriod,
+            'menuId' => $menuId,
+        ]);
     }
 }
