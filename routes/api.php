@@ -77,7 +77,7 @@ Route::get('/orderlist-chef-test', [ChefController::class, 'orderListChefTest'])
 
 use App\Http\Controllers\DeliveryController;
 
-Route::get('/delivery', [DeliveryController::class, 'deliveryList']);
+Route::get('/delivery-list', [DeliveryController::class, 'deliveryList']);
 Route::get('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
 
 

@@ -25,7 +25,6 @@ class OrderController extends Controller
 
 
             $menuController = new MenuController();
-            // Retrieve data from the request
             $menuId = $request->input('menuId');
             $date = $request->input('date');
             $price = $request->input('price');
@@ -54,7 +53,9 @@ class OrderController extends Controller
 
                 $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
 
-                if ($orderExistance == "enabled") { // Update the order based on the menuId and userId
+                if ($orderExistance == "enabled") {
+
+                    //UPDATE ORDER IF ORDER EXISTS
                     $updatedRows = OrderMod::where(
                         'mrd_order_menu_id',
                         $menuId
@@ -67,6 +68,19 @@ class OrderController extends Controller
                             'mrd_order_quantity' => $quantity,
                             'mrd_order_status' => 'pending'
                         ]);
+
+                    $orderId = DB::table('mrd_order')
+                        ->where('mrd_order_menu_id', $menuId)
+                        ->where('mrd_order_user_id', $userId)
+                        ->where('mrd_order_date', $date)
+                        ->pluck('mrd_order_id')
+                        ->first();
+
+
+                    //UPDATE PAYMENT IF PAYMENT EXISTS
+                    $userCreditUpdate = DB::table('mrd_payment')
+                        ->where('mrd_payment_order_id', $orderId)
+                        ->update(['mrd_payment_amount' => $price]);
 
 
                     // Return a response based on update result
@@ -83,22 +97,46 @@ class OrderController extends Controller
                         ]);
                     }
                 } else {
-                    // Insert data into the mrd_order table
+                    //MRD_ORDER INSERT DATA, NEW ORDER
                     $order = new OrderMod();
                     $order->mrd_order_user_id = $userId; // Replace $TFLoginToken with $userId
                     $order->mrd_order_menu_id = $menuId;
-                    $order->mrd_order_quantity = $quantity; // Assuming a default value, adjust as necessary
-
+                    $order->mrd_order_quantity = $quantity;
                     $order->mrd_order_mealbox = $this->getUserMealboxById($userId);
-
                     $order->mrd_order_total_price = $price;
                     $order->mrd_order_date = $date;
                     $order->save();
+
+
+
+
+                    $orderId = DB::table('mrd_order')
+                        ->where('mrd_order_menu_id', $menuId)
+                        ->where('mrd_order_user_id', $userId)
+                        ->where('mrd_order_date', $date)
+                        ->pluck('mrd_order_id')
+                        ->first();
+
+                    // //PAYMENT INSERT ON NEW ORDER
+                    $paymentInsert = DB::table('mrd_payment')->insert([
+                        'mrd_payment_user_id' =>
+                        $userId,
+                        'mrd_payment_order_id' =>
+                        $orderId,
+                        'mrd_payment_for' =>
+                        'order',
+                        'mrd_payment_amount' =>
+                        $price
+                    ]);
+
+
+
 
                     // Return a success response
                     return response()->json([
                         'success' => true,
                         'message' => 'Order inserted successfully',
+                        'orderId' => $orderId,
                         'data' => $order
                     ]);
                 }
@@ -146,10 +184,8 @@ class OrderController extends Controller
 
 
         if ($userId) {
-            $updatedRows = OrderMod::where(
-                'mrd_order_menu_id',
-                $menuId
-            )
+            $updatedRows = DB::table('mrd_order')
+                ->where('mrd_order_menu_id', $menuId)
                 ->where('mrd_order_user_id', $userId)
                 ->where('mrd_order_date', $date)
                 ->update([
@@ -158,9 +194,36 @@ class OrderController extends Controller
                 ]);
 
 
+            $orderId = DB::table('mrd_order')
+                ->where('mrd_order_menu_id', $menuId)
+                ->where('mrd_order_user_id', $userId)
+                ->where('mrd_order_date', $date)
+                ->pluck('mrd_order_id')
+                ->first();
+
+
+            // NOTIFCATION UPDATE FOR QUANTITY
+            $updateNotif = DB::table('mrd_notification')
+                ->where('mrd_notif_order_id', $orderId)
+                ->update([
+                    'mrd_notif_quantity' => $quantityValue,
+                    'mrd_notif_total_price' => $totalPrice,
+                ]);
+
+
+            //UPDATE PAYMENT IF PAYMENT EXISTS
+
+            $userCreditUpdate = DB::table('mrd_payment')
+                ->where('mrd_payment_order_id', $orderId)
+                ->update(['mrd_payment_amount' => $totalPrice]);
+
+
+
+
             return response()->json([
                 'success' => true,
                 'message' => 'Quantity has been changed',
+                'orderId' => $orderId,
                 //'data' => $menuId, $date, $TFLoginToken, $quantityValue
 
 

@@ -8,10 +8,8 @@ use Illuminate\Http\Request;
 
 class DeliveryController extends Controller
 {
-    //MARK: Delivery Today
     public function deliveryList(Request $request)
     {
-
         // Set the variables for date criteria and order status
         $orderlistof = "todayafter"; // Default to 'alltime' if not provided
         $orderstatus = "all";
@@ -26,6 +24,7 @@ class DeliveryController extends Controller
             ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
             ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
             ->join('mrd_area', 'mrd_user.mrd_user_area', '=', 'mrd_area.mrd_area_id')
+            ->join('mrd_payment', 'mrd_order.mrd_order_id', '=', 'mrd_payment.mrd_payment_order_id')
             ->select(
                 'mrd_menu.mrd_menu_period',
                 'mrd_menu.mrd_menu_id',
@@ -39,12 +38,13 @@ class DeliveryController extends Controller
                 'mrd_user.mrd_user_address',
                 'mrd_user.mrd_user_phone',
                 'mrd_user.mrd_user_first_name',
+                'mrd_user.mrd_user_credit',
                 'mrd_user.mrd_user_delivery_instruction',
-                'mrd_area.mrd_area_name'
+                'mrd_area.mrd_area_name',
+                'mrd_payment.mrd_payment_amount'
 
             )
             ->orderBy('mrd_order.mrd_order_date', 'asc');
-
 
         if ($orderarea !== "all") {
             $ordersQuery->where('mrd_area.mrd_area_id', '=', $orderarea);
@@ -54,7 +54,6 @@ class DeliveryController extends Controller
             $ordersQuery->where('mrd_menu.mrd_menu_period', '=', $orderperiod);
         }
 
-        // Modify query based on the value of $orderlistof
         if ($orderlistof === 'today') {
             $ordersQuery->whereDate('mrd_order.mrd_order_date', '=', $today);
         } elseif ($orderlistof === 'todayafter') {
@@ -69,6 +68,23 @@ class DeliveryController extends Controller
         // Fetch the orders
         $orders = $ordersQuery->get();
 
+        // Calculate the balance and add it to each order
+        foreach ($orders as $order) {
+            //$order->cash_to_get = max(0, $order->mrd_order_total_price - $order->mrd_user_credit);
+            // $order->cash_to_get =
+            // $order->mrd_order_total_price - $order->mrd_user_credit;
+
+            $subtotal = $order->mrd_user_credit -
+                $order->mrd_order_total_price;
+
+            if ($subtotal > 0) {
+                $order->cash_to_get = 0;
+            } else {
+
+                $order->cash_to_get = $subtotal;
+            }
+        }
+
         // Initialize an empty associative array to store grouped orders
         $groupedOrders = [];
 
@@ -76,12 +92,10 @@ class DeliveryController extends Controller
             $date = $order->mrd_order_date;
             $period = $order->mrd_menu_period;
 
-
             // Check if the date key exists in $groupedOrders, if not, initialize it as an empty array
             if (!isset($groupedOrders[$date])) {
                 $groupedOrders[$date] = [];
             }
-
 
             // Check if the period key exists in $groupedOrders[$date], if not, initialize it as an empty array
             if (!isset($groupedOrders[$date][$period])) {
@@ -91,8 +105,6 @@ class DeliveryController extends Controller
             // Push the current order into the array under its corresponding date and period
             $groupedOrders[$date][$period][] = $order;
         }
-
-
 
         return response()->json($groupedOrders);
     }
@@ -136,13 +148,22 @@ class DeliveryController extends Controller
 
 
         if ($delivStatus == 'delivered') {
-            $notif_message =  "Your " . $menuPeriod . " has been delivered. Quantity (" . $orderQuantity . ")";
+            $notif_message =  "Your " . $menuPeriod . " has been delivered.";
             $userCreditNew = $userCredit - $orderTotalPrice;
             $notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
 
+            //CREDIT UPDATE USER TABLE
             $userCreditUpdate = DB::table('mrd_user')
                 ->where('mrd_user_id', $userId)
                 ->update(['mrd_user_credit' => $userCreditNew]);
+
+            //PAYMENT INSERT
+            $notifInsert = DB::table('mrd_payment')->insert([
+                'mrd_payment_user_id' =>
+                $userId,
+                'mrd_payment_amount_paid' => $orderTotalPrice,
+
+            ]);
         } elseif ($delivStatus == 'cancelled') {
             $notif_message =  "Your " . $menuPeriod . " was canceled.";
             $notif_credit_calc =
@@ -155,16 +176,17 @@ class DeliveryController extends Controller
 
 
 
-
+        //NOTIFICATION INSERT
         $notifInsert = DB::table('mrd_notification')->insert([
             'mrd_notif_user_id' =>
             $userId,
             'mrd_notif_message' => $notif_message,
-            'mrd_notif_credit_calc' => $notif_credit_calc,
+
+            'mrd_notif_total_price' => $notif_credit_calc,
             'mrd_notif_type' => 'order'
         ]);
 
-
+        // //ORDER DELIVE STATUS UPDATE
         $delivUpdate = DB::table('mrd_order')
             ->where('mrd_order_id', $orderId)
             ->update(['mrd_order_status' => $delivStatus]);
@@ -172,6 +194,7 @@ class DeliveryController extends Controller
 
         return response()->json([
             'success' => true,
+            'notif' => $notif_message,
             'delivStatus' => $delivStatus,
             'orderId' => $orderId,
             'userId' => $userId,

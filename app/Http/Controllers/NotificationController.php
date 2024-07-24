@@ -55,20 +55,31 @@ class NotificationController extends Controller
         }
 
 
+        $orderId = DB::table('mrd_order')
+            ->where('mrd_order_menu_id', $menuId)
+            ->where('mrd_order_user_id', $userId)
+            ->where('mrd_order_date', $date)
+            ->pluck('mrd_order_id')
+            ->first();
+
 
 
         $notifInsert = DB::table('mrd_notification')->insert([
             'mrd_notif_user_id' =>
             $userId,
             'mrd_notif_message' => $notif_message,
-            'mrd_notif_type' => 'order'
+            'mrd_notif_order_id' => $orderId,
+            'mrd_notif_total_price' => $price,
+            'mrd_notif_type' => 'order',
+            'mrd_notif_quantity' => $quantity,
         ]);
 
 
 
         return response()->json([
             'success' => true,
-            'message' => 'Notification added'
+            'message' => 'Notification added',
+            'orderId' => $orderId
         ]);
     }
 
@@ -78,12 +89,15 @@ class NotificationController extends Controller
     public function notifMealbox($userId, $switchValue)
     {
 
+        $mealBoxPrice = DB::table('mrd_setting')
+            ->value('mrd_setting_mealbox_price');
+
         if (
             $switchValue == 1
         ) {
-            $notif_message =  "Activated mealbox for TK 150.";
+            $notif_message =  "Activated mealbox for TK " . $mealBoxPrice . ".";
         } else {
-            $notif_message =  "Deactivated mealbox, Tk 150 will be refunded.";
+            $notif_message =  "Deactivated mealbox, Tk " . $mealBoxPrice . " will be refunded.";
         }
 
 
@@ -93,18 +107,6 @@ class NotificationController extends Controller
             'mrd_notif_message' => $notif_message,
             'mrd_notif_type' => 'mealbox'
         ]);
-
-        // if ($mealboxStat) {
-        //     return response()->json([
-        //         'success' => true,
-        //         'mealbox' => 'Notifcation inserted successfully',
-        //     ]);
-        // } else {
-        //     return response()->json([
-        //         'success' => false,
-        //         'mealbox' => 'Notifcation was not added.',
-        //     ]);
-        // }
     }
 
     //MARK: GET NOTIFICATIONS
@@ -116,7 +118,7 @@ class NotificationController extends Controller
             ->where('mrd_user_session_token', $TFLoginToken)
             ->value('mrd_user_id');
 
-        $notifications = DB::select("SELECT mrd_notif_message,mrd_notif_date_added,mrd_notif_credit_calc FROM mrd_notification WHERE mrd_notif_user_id = $userId ORDER BY mrd_notif_date_added DESC LIMIT 100");
+        $notifications = DB::select("SELECT mrd_notif_message,mrd_notif_date_added,mrd_notif_quantity,mrd_notif_total_price,mrd_notif_type FROM mrd_notification WHERE mrd_notif_user_id = $userId ORDER BY mrd_notif_date_added DESC LIMIT 100");
 
         return response()->json([
 
