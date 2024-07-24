@@ -54,7 +54,6 @@ class NotificationController extends Controller
             $notif_message =  "Canceled " . $menuPeriod . " of " . $formattedDate;
         }
 
-
         $orderId = DB::table('mrd_order')
             ->where('mrd_order_menu_id', $menuId)
             ->where('mrd_order_user_id', $userId)
@@ -73,6 +72,16 @@ class NotificationController extends Controller
             'mrd_notif_type' => 'order',
             'mrd_notif_quantity' => $quantity,
         ]);
+
+        $creditSum = $userCredit + $price;
+
+        if ($creditSum < 0) {
+
+            echo "The sum is negative.";
+
+            $notif_message =  "Ordered " . $menuPeriod . " of " . $formattedDate;
+        }
+
 
 
 
