@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 
 class DeliveryController extends Controller
 {
+    //MARK: deliveryList
     public function deliveryList(Request $request)
     {
         // Set the variables for date criteria and order status
@@ -24,7 +25,7 @@ class DeliveryController extends Controller
             ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
             ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
             ->join('mrd_area', 'mrd_user.mrd_user_area', '=', 'mrd_area.mrd_area_id')
-            ->join('mrd_payment', 'mrd_order.mrd_order_id', '=', 'mrd_payment.mrd_payment_order_id')
+            // ->join('mrd_payment', 'mrd_order.mrd_order_id', '=', 'mrd_payment.mrd_payment_order_id')
             ->select(
                 'mrd_menu.mrd_menu_period',
                 'mrd_menu.mrd_menu_id',
@@ -32,6 +33,7 @@ class DeliveryController extends Controller
                 'mrd_order.mrd_order_date',
                 'mrd_order.mrd_order_quantity',
                 'mrd_order.mrd_order_total_price',
+                'mrd_order.mrd_order_cash_to_get',
                 'mrd_order.mrd_order_mealbox',
                 'mrd_order.mrd_order_status',
                 'mrd_user.mrd_user_id',
@@ -41,7 +43,7 @@ class DeliveryController extends Controller
                 'mrd_user.mrd_user_credit',
                 'mrd_user.mrd_user_delivery_instruction',
                 'mrd_area.mrd_area_name',
-                'mrd_payment.mrd_payment_amount'
+                // 'mrd_payment.mrd_payment_amount'
 
             )
             ->orderBy('mrd_order.mrd_order_date', 'asc');
@@ -70,19 +72,20 @@ class DeliveryController extends Controller
 
         // Calculate the balance and add it to each order
         foreach ($orders as $order) {
-            //$order->cash_to_get = max(0, $order->mrd_order_total_price - $order->mrd_user_credit);
-            // $order->cash_to_get =
-            // $order->mrd_order_total_price - $order->mrd_user_credit;
 
-            $subtotal = $order->mrd_user_credit -
-                $order->mrd_order_total_price;
 
-            if ($subtotal > 0) {
-                $order->cash_to_get = 0;
-            } else {
+            // $subtotal = $order->mrd_user_credit -
+            //     $order->mrd_order_total_price;
 
-                $order->cash_to_get = $subtotal;
-            }
+            // if ($subtotal > 0) {
+            //     $order->cash_to_get = 0;
+            // } else {
+
+            //     $order->cash_to_get = $subtotal;
+            // }
+
+
+            // $order->cash_to_get = 
         }
 
         // Initialize an empty associative array to store grouped orders
@@ -109,7 +112,7 @@ class DeliveryController extends Controller
         return response()->json($groupedOrders);
     }
 
-    //MARK: DeliveryLater
+    //MARK: deliveryUpdate
     public function deliveryUpdate(Request $request)
     {
 
@@ -118,9 +121,6 @@ class DeliveryController extends Controller
         $userId = $request->input('userId');
         $mealPeriod = $request->input('mealType');
         $menuId = $request->input('menuId');
-
-
-        // Fetch user ID based on session token
 
 
 
@@ -149,22 +149,133 @@ class DeliveryController extends Controller
 
         if ($delivStatus == 'delivered') {
             $notif_message =  "Your " . $menuPeriod . " has been delivered.";
-            $userCreditNew = $userCredit - $orderTotalPrice;
-            $notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
 
-            //CREDIT UPDATE USER TABLE
-            $userCreditUpdate = DB::table('mrd_user')
-                ->where('mrd_user_id', $userId)
-                ->update(['mrd_user_credit' => $userCreditNew]);
+            //$notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
 
-            //PAYMENT INSERT
-            $notifInsert = DB::table('mrd_payment')->insert([
-                'mrd_payment_user_id' =>
-                $userId,
-                'mrd_payment_amount_paid' => $orderTotalPrice,
+            $notif_credit_calc = null;
 
-            ]);
-        } elseif ($delivStatus == 'cancelled') {
+
+
+
+
+            //FIND THE NEXT ORDER ID AND ITS TOTAL PRICE FOR THE SAME USERID
+            $nextOrder = DB::table('mrd_order')
+                ->where('mrd_order_user_id', $userId)
+                ->where('mrd_order_id', '>', $orderId)
+                ->orderBy('mrd_order_id', 'asc')
+                ->select('mrd_order_id', 'mrd_order_total_price')
+                ->first();
+
+
+            if (
+                $nextOrder
+            ) {
+
+                $nextOrderId = $nextOrder->mrd_order_id;
+                $nextOrderTotalPrice = $nextOrder->mrd_order_total_price;
+
+
+                // 200 INITITAL CREDIT 
+
+                // 2024-08-01  CALCULATED
+                // 150 
+                // coc = 0 
+
+                // 2024-08-02
+                // 50 - 100 = -50  (subtotal credit)
+                // coc = 50
+
+                // 2024-08-05
+                // -50 - 150 = -200  (subtotal credit)
+                // coc = 0
+
+                $subtotal = $userCredit - $nextOrderTotalPrice;
+
+
+                if ($subtotal > 0) {
+                    $cash_to_get = 0;
+
+                    $userCreditNew = $userCredit - $orderTotalPrice;
+                    //CREDIT UPDATE USER TABLE
+                    $userCreditUpdate = DB::table('mrd_user')
+                        ->where('mrd_user_id', $userId)
+                        ->update(['mrd_user_credit' => $userCreditNew]);
+                } elseif ($subtotal < 0) {
+                    $cash_to_get = abs($subtotal);
+
+                    //CREDIT UPDATE USER TABLE TO 0
+                    $userCreditUpdate = DB::table('mrd_user')
+                        ->where('mrd_user_id', $userId)
+                        ->update(['mrd_user_credit' => '0']);
+
+                    // if ($userCreditNew < $nextOrderTotalPrice) {
+
+                    // }
+                } else {
+                    return "The number is zero.";
+                }
+
+
+
+                //CASH TO GET UPDATE
+                $cashToGet = DB::table('mrd_order')
+                    ->where('mrd_order_id', $nextOrderId)
+                    ->update(['mrd_order_cash_to_get' => $cash_to_get]);
+            }
+        }
+        //elseif (
+        //     $delivStatus == 'delivered_with_due'
+        // ) {
+
+        //     $notif_message =  "Your " . $menuPeriod . " has been delivered.";
+        //     $userCreditNew = $userCredit - $orderTotalPrice;
+        //     $notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
+
+        //     //CREDIT UPDATE USER TABLE
+        //     $userCreditUpdate = DB::table('mrd_user')
+        //         ->where('mrd_user_id', $userId)
+        //         ->update(['mrd_user_credit' => $userCreditNew]);
+
+
+        //     //FIND THE NEXT ORDER ID AND ITS TOTAL PRICE FOR THE SAME USERID
+        //     $nextOrder = DB::table('mrd_order')
+        //         ->where('mrd_order_user_id', $userId)
+        //         ->where('mrd_order_id', '>', $orderId)
+        //         ->orderBy('mrd_order_id', 'asc')
+        //         ->select('mrd_order_id', 'mrd_order_total_price')
+        //         ->first();
+
+
+        //     if (
+        //         $nextOrder
+        //     ) {
+
+        //         $nextOrderId = $nextOrder->mrd_order_id;
+        //         $nextOrderTotalPrice = $nextOrder->mrd_order_total_price;
+
+
+        //         //GET USER CREDIT
+        //         $userCredit = DB::table('mrd_user')
+        //             ->where('mrd_user_id', $userId)
+        //             ->value('mrd_user_credit');
+
+        //         $subtotal = $userCredit - $nextOrderTotalPrice;
+
+        //         if ($subtotal > 0) {
+        //             $cash_to_get = 0;
+        //         } else {
+
+        //             $cash_to_get = abs($subtotal);
+        //         }
+
+
+        //         //CASH TO GET UPDATE
+        //         $cashToGet = DB::table('mrd_order')
+        //             ->where('mrd_order_id', $nextOrderId)
+        //             ->update(['mrd_order_cash_to_get' => $cash_to_get]);
+        //     }
+        // } 
+        elseif ($delivStatus == 'cancelled') {
             $notif_message =  "Your " . $menuPeriod . " was canceled.";
             $notif_credit_calc =
                 null;
@@ -186,14 +297,19 @@ class DeliveryController extends Controller
             'mrd_notif_type' => 'order'
         ]);
 
-        // //ORDER DELIVE STATUS UPDATE
+        //ORDER DELIVE STATUS UPDATE
         $delivUpdate = DB::table('mrd_order')
             ->where('mrd_order_id', $orderId)
             ->update(['mrd_order_status' => $delivStatus]);
 
 
+
+
         return response()->json([
             'success' => true,
+            'userCredit' => $userCredit,
+            'nextOrderTotalPrice' => $nextOrderTotalPrice,
+            'subtotal' => $subtotal,
             'notif' => $notif_message,
             'delivStatus' => $delivStatus,
             'orderId' => $orderId,

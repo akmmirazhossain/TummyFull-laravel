@@ -53,6 +53,7 @@ class OrderController extends Controller
 
                 $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
 
+                //IF ORDER EXISTS
                 if ($orderExistance == "enabled") {
 
                     //UPDATE ORDER IF ORDER EXISTS
@@ -97,25 +98,54 @@ class OrderController extends Controller
                         ]);
                     }
                 } else {
-                    //MRD_ORDER INSERT DATA, NEW ORDER
-                    $order = new OrderMod();
-                    $order->mrd_order_user_id = $userId; // Replace $TFLoginToken with $userId
-                    $order->mrd_order_menu_id = $menuId;
-                    $order->mrd_order_quantity = $quantity;
-                    $order->mrd_order_mealbox = $this->getUserMealboxById($userId);
-                    $order->mrd_order_total_price = $price;
-                    $order->mrd_order_date = $date;
-                    $order->save();
-
-
-
-
+                    //NEW ORDER, INSERT
                     $orderId = DB::table('mrd_order')
                         ->where('mrd_order_menu_id', $menuId)
                         ->where('mrd_order_user_id', $userId)
                         ->where('mrd_order_date', $date)
                         ->pluck('mrd_order_id')
                         ->first();
+
+                    $userCredit = DB::table('mrd_user')
+                        ->where('mrd_user_id', $userId)
+                        ->value('mrd_user_credit');
+
+                    $orderTotalPrice = DB::table('mrd_order')
+                        ->where('mrd_order_id', $orderId)
+                        ->value('mrd_order_total_price');
+
+
+                    $orderQuantity = DB::table('mrd_order')
+                        ->where('mrd_order_id', $orderId)
+                        ->value('mrd_order_quantity');
+
+                    $menuPeriod = DB::table('mrd_menu')
+                        ->where('mrd_menu_id', $menuId)
+                        ->value('mrd_menu_period');
+
+                    $subtotal = $userCredit - $price;
+
+                    if ($subtotal > 0) {
+                        $cash_to_get = 0;
+                    } else {
+
+                        $cash_to_get = abs($subtotal);
+                    }
+
+
+
+                    //MRD_ORDER INSERT DATA, NEW ORDER
+                    $order = DB::table('mrd_order')->insert([
+                        'mrd_order_user_id' => $userId,
+                        'mrd_order_menu_id' => $menuId,
+                        'mrd_order_quantity' => $quantity,
+                        'mrd_order_mealbox' => $this->getUserMealboxById($userId),
+                        'mrd_order_total_price' => $price,
+                        'mrd_order_cash_to_get' => $cash_to_get,
+                        'mrd_order_date' => $date
+                    ]);
+
+
 
                     // //PAYMENT INSERT ON NEW ORDER
                     $paymentInsert = DB::table('mrd_payment')->insert([
@@ -184,14 +214,35 @@ class OrderController extends Controller
 
 
         if ($userId) {
+
+
+            $userCredit = DB::table('mrd_user')
+                ->where('mrd_user_id', $userId)
+                ->value('mrd_user_credit');
+
+            $subtotal = $userCredit - $totalPrice;
+
+            if ($subtotal > 0) {
+                $cash_to_get = 0;
+            } else {
+
+                $cash_to_get = abs($subtotal);
+            }
+
+
+            //UPDATE ORDER WITH NEW QUANTITY
             $updatedRows = DB::table('mrd_order')
                 ->where('mrd_order_menu_id', $menuId)
                 ->where('mrd_order_user_id', $userId)
                 ->where('mrd_order_date', $date)
                 ->update([
                     'mrd_order_quantity' => $quantityValue,
-                    'mrd_order_total_price' => $totalPrice
+                    'mrd_order_total_price' => $totalPrice,
+                    'mrd_order_cash_to_get' => $cash_to_get
                 ]);
+
+
+
 
 
             $orderId = DB::table('mrd_order')
