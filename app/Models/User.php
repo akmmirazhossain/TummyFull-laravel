@@ -10,9 +10,30 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+
     protected $primaryKey = 'mrd_user_id';
     protected $table = 'mrd_user';
 
+    // Add these lines to customize the email and password columns
+    public function getAuthIdentifierName()
+    {
+        return 'mrd_user_id';
+    }
+
+    public function getAuthIdentifier()
+    {
+        return $this->mrd_user_id;
+    }
+
+    public function getAuthPassword()
+    {
+        return $this->mrd_user_password;
+    }
+
+    public function getEmailForPasswordReset()
+    {
+        return $this->mrd_user_email;
+    }
 
     protected $fillable = [
         'mrd_user_id',
@@ -36,12 +57,10 @@ class User extends Authenticatable
         'mrd_user_date_added',
     ];
 
-
     protected $hidden = [
-        'password',
+        'mrd_user_password',
         'remember_token',
     ];
-
 
     protected $casts = [
         'email_verified_at' => 'datetime',

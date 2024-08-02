@@ -143,16 +143,56 @@ class DeliveryController extends Controller
 
 
 
-        // $formattedDate = Carbon::parse($date)->format('F j (l)');
 
 
 
         if ($delivStatus == 'delivered') {
             $notif_message =  "Your " . $menuPeriod . " has been delivered.";
-
             //$notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
-
             $notif_credit_calc = null;
+
+
+            // Calculate the remaining wallet balance and cash needed for the order
+
+            //userCredit = 200
+            //orderTotalPrice = 150
+            //creditNew = 50
+
+            //userCredit = 50
+            //orderTotalPrice = 150
+            //creditNew = 0
+
+
+
+            if ($userCredit >= $orderTotalPrice) {
+                $userCreditNew = $userCredit - $orderTotalPrice;
+                $cashToCollect = 0;
+            } else {
+                $userCreditNew = 0;
+                $cashToCollect = $orderTotalPrice - $userCredit;
+            }
+
+            // Update the customer's wallet balance
+            $userCreditUpdate = DB::table('mrd_user')
+                ->where('mrd_user_id', $userId)
+                ->update(['mrd_user_credit' => $userCreditNew]);
+
+
+            //NOTIFICATION INSERT
+            $notifInsert = DB::table('mrd_notification')->insert([
+                'mrd_notif_user_id' =>
+                $userId,
+                'mrd_notif_message' => $notif_message,
+
+                'mrd_notif_total_price' => $notif_credit_calc,
+                'mrd_notif_type' => 'order'
+            ]);
+
+            //ORDER DELIVE STATUS UPDATE
+            $delivUpdate = DB::table('mrd_order')
+                ->where('mrd_order_id', $orderId)
+                ->update(['mrd_order_status' => $delivStatus]);
+
 
 
 
@@ -167,12 +207,24 @@ class DeliveryController extends Controller
                 ->first();
 
 
+
+
             if (
                 $nextOrder
             ) {
 
                 $nextOrderId = $nextOrder->mrd_order_id;
                 $nextOrderTotalPrice = $nextOrder->mrd_order_total_price;
+
+
+
+                $userCreditUpdated = DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->value('mrd_user_credit');
+
+                $subtotal = $userCreditUpdated - $nextOrderTotalPrice;
+
+
 
 
                 // 200 INITITAL CREDIT 
@@ -189,31 +241,40 @@ class DeliveryController extends Controller
                 // -50 - 150 = -200  (subtotal credit)
                 // coc = 0
 
-                $subtotal = $userCredit - $nextOrderTotalPrice;
 
-
-                if ($subtotal > 0) {
+                if (
+                    $userCreditUpdated >= $nextOrderTotalPrice
+                ) {
+                    //$userCreditUpdatedNew = $userCreditUpdated - $nextOrderTotalPrice;
                     $cash_to_get = 0;
-
-                    $userCreditNew = $userCredit - $orderTotalPrice;
-                    //CREDIT UPDATE USER TABLE
-                    $userCreditUpdate = DB::table('mrd_user')
-                        ->where('mrd_user_id', $userId)
-                        ->update(['mrd_user_credit' => $userCreditNew]);
-                } elseif ($subtotal < 0) {
-                    $cash_to_get = abs($subtotal);
-
-                    //CREDIT UPDATE USER TABLE TO 0
-                    $userCreditUpdate = DB::table('mrd_user')
-                        ->where('mrd_user_id', $userId)
-                        ->update(['mrd_user_credit' => '0']);
-
-                    // if ($userCreditNew < $nextOrderTotalPrice) {
-
-                    // }
                 } else {
-                    return "The number is zero.";
+                    // $userCreditUpdatedNew = 0;
+                    $cash_to_get = $nextOrderTotalPrice - $userCreditUpdated;
                 }
+
+
+                // if ($subtotal > 0) {
+                //     $cash_to_get = 0;
+
+                //     $userCreditNew = $userCredit - $orderTotalPrice;
+                //     //CREDIT UPDATE USER TABLE
+                //     $userCreditUpdate = DB::table('mrd_user')
+                //         ->where('mrd_user_id', $userId)
+                //         ->update(['mrd_user_credit' => $userCreditNew]);
+                // } elseif ($subtotal < 0) {
+                //     $cash_to_get = abs($subtotal);
+
+                //     //CREDIT UPDATE USER TABLE TO 0
+                //     $userCreditUpdate = DB::table('mrd_user')
+                //         ->where('mrd_user_id', $userId)
+                //         ->update(['mrd_user_credit' => '0']);
+
+                //     // if ($userCreditNew < $nextOrderTotalPrice) {
+
+                //     // }
+                // } else {
+                //     return "The number is zero.";
+                // }
 
 
 
@@ -287,29 +348,14 @@ class DeliveryController extends Controller
 
 
 
-        //NOTIFICATION INSERT
-        $notifInsert = DB::table('mrd_notification')->insert([
-            'mrd_notif_user_id' =>
-            $userId,
-            'mrd_notif_message' => $notif_message,
-
-            'mrd_notif_total_price' => $notif_credit_calc,
-            'mrd_notif_type' => 'order'
-        ]);
-
-        //ORDER DELIVE STATUS UPDATE
-        $delivUpdate = DB::table('mrd_order')
-            ->where('mrd_order_id', $orderId)
-            ->update(['mrd_order_status' => $delivStatus]);
-
 
 
 
         return response()->json([
             'success' => true,
             'userCredit' => $userCredit,
-            'nextOrderTotalPrice' => $nextOrderTotalPrice,
-            'subtotal' => $subtotal,
+            // 'nextOrderTotalPrice' => $nextOrderTotalPrice,
+            // 'subtotal' => $subtotal,
             'notif' => $notif_message,
             'delivStatus' => $delivStatus,
             'orderId' => $orderId,
