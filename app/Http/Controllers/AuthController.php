@@ -3,57 +3,56 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Validator;
-use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    function index()
+    public function showLoginForm()
     {
-        return view('login');
+        return view('auth.login');
     }
 
-    function checklogin(Request $request)
+    public function checklogin(Request $request)
     {
         $this->validate($request, [
-            'email'   => 'required|email',
-            'password'  => 'required|alphaNum|min:3'
+            'email' => 'required|email',
+            'password' => 'required|alphaNum|min:3'
         ]);
-
-
-        // $user = User::where('mrd_user_email', $request->get('email'))->first();
 
         $password = DB::table('mrd_user')
             ->where('mrd_user_email', $request->get('email'))
             ->value('mrd_user_password');
 
+             $mrd_user_type = DB::table('mrd_user')
+            ->where('mrd_user_email', $request->get('email'))
+            ->value('mrd_user_type');
 
-        if ($password && $request->get('password')) {
-            Auth::login($password);
-            return redirect('main/successlogin');
+        if (Hash::check($request->get('password'), $password)) {
+         
+              // Check if the user type is 'admin'
+                if ($mrd_user_type === 'admin') {
+                   $request->session()->regenerate();
+                    $user = DB::table('mrd_user')->where('mrd_user_email', $request->get('email'))->first();
+                    $request->session()->put('user', $user);
+                    
+                    // Redirect to the success page
+                    return redirect('/admin');
+                } else {
+                    // Handle non-admin user case
+                    return back()->with('error', 'You are not authorized to access this page.');
+                }
+
         } else {
             return back()->with('error', 'Wrong Login Details');
         }
-
-        // if ($password && Hash::check($request->get('password'), $password)) {
-        //     // Auth::login($password);
-        //     return redirect('main/successlogin');
-        // } else {
-        //     return back()->with('error', 'Wrong Login Details');
-        // }
     }
 
-    function successlogin()
-    {
-        return view('successlogin');
-    }
+  
 
-    function logout()
+    public function logout(Request $request)
     {
-        Auth::logout();
-        return redirect('main');
+        $request->session()->flush();
+        return redirect('/login');
     }
 }

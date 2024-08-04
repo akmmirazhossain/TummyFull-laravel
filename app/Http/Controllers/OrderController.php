@@ -56,6 +56,21 @@ class OrderController extends Controller
                 //IF ORDER EXISTS
                 if ($orderExistance == "enabled") {
 
+                    //GET CASH TO GET VALUE
+                    $userCredit = DB::table('mrd_user')
+                        ->where('mrd_user_id', $userId)
+                        ->value('mrd_user_credit');
+
+                    $subtotal = $userCredit - $price;
+
+                    if ($subtotal > 0) {
+                        $cash_to_get = 0;
+                    } else {
+
+                        $cash_to_get = abs($subtotal);
+                    }
+
+
                     //UPDATE ORDER IF ORDER EXISTS
                     $updatedRows = OrderMod::where(
                         'mrd_order_menu_id',
@@ -67,6 +82,7 @@ class OrderController extends Controller
                             'mrd_order_total_price' => $price,
                             'mrd_order_mealbox' => $this->getUserMealboxById($userId),
                             'mrd_order_quantity' => $quantity,
+                            'mrd_order_cash_to_get' => $cash_to_get,
                             'mrd_order_status' => 'pending'
                         ]);
 

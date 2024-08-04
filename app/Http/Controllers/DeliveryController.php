@@ -152,17 +152,6 @@ class DeliveryController extends Controller
             $notif_credit_calc = null;
 
 
-            // Calculate the remaining wallet balance and cash needed for the order
-
-            //userCredit = 200
-            //orderTotalPrice = 150
-            //creditNew = 50
-
-            //userCredit = 50
-            //orderTotalPrice = 150
-            //creditNew = 0
-
-
 
             if ($userCredit >= $orderTotalPrice) {
                 $userCreditNew = $userCredit - $orderTotalPrice;
@@ -195,18 +184,12 @@ class DeliveryController extends Controller
 
 
 
-
-
-
-            //FIND THE NEXT ORDER ID AND ITS TOTAL PRICE FOR THE SAME USERID
             $nextOrder = DB::table('mrd_order')
                 ->where('mrd_order_user_id', $userId)
-                ->where('mrd_order_id', '>', $orderId)
-                ->orderBy('mrd_order_id', 'asc')
+                ->where('mrd_order_status', 'pending')
+                ->orderBy('mrd_order_date', 'asc')
                 ->select('mrd_order_id', 'mrd_order_total_price')
                 ->first();
-
-
 
 
             if (
@@ -221,10 +204,6 @@ class DeliveryController extends Controller
                 $userCreditUpdated = DB::table('mrd_user')
                     ->where('mrd_user_id', $userId)
                     ->value('mrd_user_credit');
-
-                $subtotal = $userCreditUpdated - $nextOrderTotalPrice;
-
-
 
 
                 // 200 INITITAL CREDIT 
@@ -242,6 +221,11 @@ class DeliveryController extends Controller
                 // coc = 0
 
 
+
+                $userCreditUpdated = DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->value('mrd_user_credit');
+
                 if (
                     $userCreditUpdated >= $nextOrderTotalPrice
                 ) {
@@ -251,32 +235,6 @@ class DeliveryController extends Controller
                     // $userCreditUpdatedNew = 0;
                     $cash_to_get = $nextOrderTotalPrice - $userCreditUpdated;
                 }
-
-
-                // if ($subtotal > 0) {
-                //     $cash_to_get = 0;
-
-                //     $userCreditNew = $userCredit - $orderTotalPrice;
-                //     //CREDIT UPDATE USER TABLE
-                //     $userCreditUpdate = DB::table('mrd_user')
-                //         ->where('mrd_user_id', $userId)
-                //         ->update(['mrd_user_credit' => $userCreditNew]);
-                // } elseif ($subtotal < 0) {
-                //     $cash_to_get = abs($subtotal);
-
-                //     //CREDIT UPDATE USER TABLE TO 0
-                //     $userCreditUpdate = DB::table('mrd_user')
-                //         ->where('mrd_user_id', $userId)
-                //         ->update(['mrd_user_credit' => '0']);
-
-                //     // if ($userCreditNew < $nextOrderTotalPrice) {
-
-                //     // }
-                // } else {
-                //     return "The number is zero.";
-                // }
-
-
 
                 //CASH TO GET UPDATE
                 $cashToGet = DB::table('mrd_order')
