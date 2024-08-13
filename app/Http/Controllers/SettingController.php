@@ -99,30 +99,30 @@ class SettingController extends Controller
             ->whereDate('mrd_order_date', '>', $today)
             ->update(['mrd_order_mealbox' => $switchValue]);
 
-        // Check if a row exists
-        $exists = DB::table('mrd_delivery')
-            ->where('mrd_delivery_user_id', $userId)
-            ->where('mrd_delivery_message_type', 'mealbox')
-            ->exists();
+        // // Check if a row exists
+        // $exists = DB::table('mrd_delivery')
+        //     ->where('mrd_delivery_user_id', $userId)
+        //     ->where('mrd_delivery_message_type', 'mealbox')
+        //     ->exists();
 
-        if ($exists) {
-            // Update existing row
-            DB::table('mrd_delivery')
-                ->where('mrd_delivery_user_id', $userId)
-                ->where('mrd_delivery_message_type', 'mealbox')
-                ->update([
-                    'mrd_delivery_status' => $switchValue == 1 ? '1' : '0',
-                    'mrd_delivery_message' => $switchValue == 1 ? 'mealbox activated' : 'mealbox deactivated'
-                ]);
-        } else {
-            // Insert new row
-            DB::table('mrd_delivery')->insert([
-                'mrd_delivery_user_id' => $userId,
-                'mrd_delivery_message_type' => 'mealbox',
-                'mrd_delivery_status' => $switchValue == 1 ? '1' : '0',
-                'mrd_delivery_message' => $switchValue == 1 ? 'mealbox activated' : 'mealbox deactivated'
-            ]);
-        }
+        // if ($exists) {
+        //     // Update existing row
+        //     DB::table('mrd_delivery')
+        //         ->where('mrd_delivery_user_id', $userId)
+        //         ->where('mrd_delivery_message_type', 'mealbox')
+        //         ->update([
+        //             'mrd_delivery_status' => $switchValue == 1 ? '1' : '0',
+        //             'mrd_delivery_message' => $switchValue == 1 ? 'mealbox activated' : 'mealbox deactivated'
+        //         ]);
+        // } else {
+        //     // Insert new row
+        //     DB::table('mrd_delivery')->insert([
+        //         'mrd_delivery_user_id' => $userId,
+        //         'mrd_delivery_message_type' => 'mealbox',
+        //         'mrd_delivery_status' => $switchValue == 1 ? '1' : '0',
+        //         'mrd_delivery_message' => $switchValue == 1 ? 'mealbox activated' : 'mealbox deactivated'
+        //     ]);
+        // }
 
 
 

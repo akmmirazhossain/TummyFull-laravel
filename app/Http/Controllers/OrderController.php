@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\MenuController;
 use Illuminate\Http\Request;
-
+use App\Http\Controllers\NotificationController;
 use \App\Models\OrderMod;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +13,15 @@ use Exception;
 
 class OrderController extends Controller
 {
+
+    protected $notificationController;
+
+    public function __construct(NotificationController $notificationController)
+    {
+        $this->notificationController = $notificationController;
+    }
+
+
     //MARK: PLACE ORDER
     public function orderPlace(Request $request)
     {
@@ -34,6 +43,21 @@ class OrderController extends Controller
 
 
 
+            //NOTIF DATA PREP
+            $notif_data = [
+                'menuId' => $menuId,
+                'date' => $date,
+                'price' => $price,
+                'TFLoginToken' => $TFLoginToken,
+                'switchValue' => $switchValue,
+                'quantity' => $quantity
+            ];
+
+            //NOTIFCATION INSERT
+            $notifRequest = new Request($notif_data);
+            return $this->notificationController->notifOrderPlace($notifRequest);
+
+
             // Fetch user ID based on session token
             $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
                 ->value('mrd_user_id');
@@ -48,8 +72,10 @@ class OrderController extends Controller
 
 
 
+
+
             // Insert Data if switchValue is true
-            if ($switchValue == 'true') {
+            if ($switchValue == '1') {
 
                 $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
 
@@ -94,6 +120,9 @@ class OrderController extends Controller
                         ->first();
 
 
+
+
+
                     //UPDATE PAYMENT IF PAYMENT EXISTS
                     $userCreditUpdate = DB::table('mrd_payment')
                         ->where('mrd_payment_order_id', $orderId)
@@ -114,6 +143,8 @@ class OrderController extends Controller
                         ]);
                     }
                 } else {
+
+
                     //NEW ORDER, INSERT
                     $orderId = DB::table('mrd_order')
                         ->where('mrd_order_menu_id', $menuId)
@@ -162,6 +193,19 @@ class OrderController extends Controller
                     ]);
 
 
+                    // //NOTIF DATA PREP
+                    // $notif_data = [
+                    //     'menuId' => $menuId,
+                    //     'date' => $date,
+                    //     'price' => $price,
+                    //     'TFLoginToken' => $TFLoginToken,
+                    //     'switchValue' => $switchValue,
+                    //     'quantity' => $quantity
+                    // ];
+
+                    // //NOTIFCATION INSERT
+                    // $notifRequest = new Request($notif_data);
+                    // return $this->notificationController->notifOrderPlace($notifRequest);
 
                     // //PAYMENT INSERT ON NEW ORDER
                     $paymentInsert = DB::table('mrd_payment')->insert([
