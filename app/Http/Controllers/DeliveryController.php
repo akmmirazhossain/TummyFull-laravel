@@ -71,22 +71,22 @@ class DeliveryController extends Controller
         $orders = $ordersQuery->get();
 
         // Calculate the balance and add it to each order
-        foreach ($orders as $order) {
+        // foreach ($orders as $order) {
 
 
-            // $subtotal = $order->mrd_user_credit -
-            //     $order->mrd_order_total_price;
+        //     $subtotal = $order->mrd_user_credit -
+        //         $order->mrd_order_total_price;
 
-            // if ($subtotal > 0) {
-            //     $order->cash_to_get = 0;
-            // } else {
+        //     if ($subtotal > 0) {
+        //         $order->cash_to_get = 0;
+        //     } else {
 
-            //     $order->cash_to_get = $subtotal;
-            // }
+        //         $order->cash_to_get = $subtotal;
+        //     }
 
 
-            // $order->cash_to_get = 
-        }
+        //     $order->cash_to_get = 
+        // }
 
         // Initialize an empty associative array to store grouped orders
         $groupedOrders = [];
@@ -111,6 +111,10 @@ class DeliveryController extends Controller
 
         return response()->json($groupedOrders);
     }
+
+
+
+
 
     //MARK: deliveryUpdate
     public function deliveryUpdate(Request $request)

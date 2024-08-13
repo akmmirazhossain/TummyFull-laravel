@@ -70,6 +70,8 @@ class SettingController extends Controller
     }
 
     //MARK: MEALBOX STATUS UPDATER
+    // Updates USER_mealbox 0,1 
+    // Updates ORDER_mealbox 0,1 after today
     public function mealboxSwitch(Request $request)
     {
         $switchValue = $request->input("switchValue");
@@ -91,7 +93,7 @@ class SettingController extends Controller
         // Get the current date
         $today = Carbon::today()->toDateString();
 
-        // Perform the update using Laravel's DB facade
+        // UPDATE ORDER MEALBOX STATUS
         $update = DB::table('mrd_order')
             ->where('mrd_order_user_id', $userId)
             ->whereDate('mrd_order_date', '>', $today)

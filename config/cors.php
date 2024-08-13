@@ -17,11 +17,11 @@ return [
 
     'paths' => ['api/*'],
 
-    //'paths' => ['api/*', 'sanctum/csrf-cookie'],
+
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:3000', 'http://192.168.0.216:3000', 'https://tummyfull-akm.netlify.app', 'https://dev.kheyecho.xyz'],
+    'allowed_origins' => ['http://localhost:3000', 'http://192.168.0.216:3000', 'https://tummyfull-akm.netlify.app', 'https://dev.kheyecho.xyz', 'https://apis.kheyecho.xyz', 'https://kheyecho.xyz', 'https://www.kheyecho.xyz'],
 
     'allowed_origins_patterns' => [],
 
