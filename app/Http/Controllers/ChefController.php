@@ -4,11 +4,118 @@ namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class ChefController extends Controller
 {
     //MARK: Chef Now
-    public function orderListChefNow()
+    public function orderListChefNow(Request $request)
+    {
+        // Set the variables for date criteria and order status
+        $orderlistof = "todayafter";
+        $orderstatus = "pending";
+        $orderperiod = "all";
+        $orderarea = "all";
+
+        $orderlistof = "todayafter";
+        $orderstatus = "pending";
+        $orderperiod = "all";
+        $orderarea = "all";
+
+        // Get the current date
+        $today = Carbon::now()->format('Y-m-d');
+
+        // Query the database based on the $orderlistof value
+        $ordersQuery = DB::table('mrd_order')
+            // ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
+            ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+            // ->join('mrd_area', 'mrd_user.mrd_user_area', '=', 'mrd_area.mrd_area_id')
+            // ->join('mrd_payment', 'mrd_order.mrd_order_id', '=', 'mrd_payment.mrd_payment_order_id')
+            ->select(
+                'mrd_order.mrd_order_id',
+                'mrd_order.mrd_order_menu_id',
+                'mrd_order.mrd_order_date',
+                'mrd_order.mrd_order_quantity',
+                'mrd_order.mrd_order_total_price',
+                'mrd_order.mrd_order_cash_to_get',
+                'mrd_order.mrd_order_mealbox',
+                'mrd_order.mrd_order_status',
+                'mrd_menu.mrd_menu_period',
+                'mrd_menu.mrd_menu_id',
+                // 'mrd_user.mrd_user_id',
+                // 'mrd_user.mrd_user_address',
+                // 'mrd_user.mrd_user_phone',
+                // 'mrd_user.mrd_user_first_name',
+                // 'mrd_user.mrd_user_credit',
+                // 'mrd_user.mrd_user_delivery_instruction',
+                // 'mrd_area.mrd_area_name',
+                // 'mrd_payment.mrd_payment_amount'
+
+            )
+            ->orderBy('mrd_order.mrd_order_date', 'asc');
+
+        if ($orderarea !== "all") {
+            $ordersQuery->where('mrd_area.mrd_area_id', '=', $orderarea);
+        }
+
+        if ($orderperiod !== "all") {
+            $ordersQuery->where('mrd_menu.mrd_menu_period', '=', $orderperiod);
+        }
+
+        if ($orderlistof === 'today') {
+            $ordersQuery->whereDate('mrd_order.mrd_order_date', '=', $today);
+        } elseif ($orderlistof === 'todayafter') {
+            $ordersQuery->whereDate('mrd_order.mrd_order_date', '>=', $today);
+        }
+
+        // Modify query based on the value of $orderstatus
+        if ($orderstatus !== "all") {
+            $ordersQuery->where('mrd_order.mrd_order_status', '=', $orderstatus);
+        }
+
+        // Fetch the orders
+        $orders = $ordersQuery->get();
+
+
+        $totalQuantity = DB::table('mrd_order')
+            ->whereIn('mrd_order_id', [/* array of mrd_order_ids */])
+            ->sum('mrd_order_quantity');
+
+
+        $groupedOrders = [];
+
+        foreach ($orders as $order) {
+            $date = $order->mrd_order_date;
+            $period = $order->mrd_menu_period;
+
+            // Initialize total quantity if not already set
+            if (!isset($groupedOrders[$date][$period]['total_quantity'])) {
+                $groupedOrders[$date][$period]['total_quantity'] = 0;
+            }
+
+            // dd($order->mrd_order_quantity);
+            // Add the order quantity to the total quantity
+            $groupedOrders[$date][$period]['total_quantity'] = $order->mrd_order_quantity;
+        }
+
+        // // Remove detailed order data, keeping only total quantity
+        // foreach ($groupedOrders as $date => $periods) {
+        //     foreach ($periods as $period => $data) {
+        //         $groupedOrders[$date][$period] = [
+        //             'total_quantity' => $data['total_quantity']
+        //         ];
+        //     }
+        // }
+
+
+
+
+        return response()->json($groupedOrders);
+    }
+
+
+
+    public function orderListChefNow2()
     {
         // Get today's date in YYYY-MM-DD format
         $today = Carbon::today()->format('Y-m-d');

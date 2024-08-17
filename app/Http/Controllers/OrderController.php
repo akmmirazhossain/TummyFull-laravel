@@ -55,7 +55,7 @@ class OrderController extends Controller
 
             //NOTIFCATION INSERT
             $notifRequest = new Request($notif_data);
-            return $this->notificationController->notifOrderPlace($notifRequest);
+            $this->notificationController->notifOrderPlace($notifRequest);
 
 
             // Fetch user ID based on session token
