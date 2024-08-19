@@ -1,0 +1,3 @@
+Procedure to upload this Laravel app:
+
+1) Clear all the caches

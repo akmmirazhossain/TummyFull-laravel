@@ -76,11 +76,61 @@ class ChefController extends Controller
         // Fetch the orders
         $orders = $ordersQuery->get();
 
+        // dd($orders);
+        // $totalQuantity = DB::table('mrd_order')
+        //     ->where('mrd_order_date', '2024-08-22')
+        //     ->where('mrd_order_menu_id', '10')
+        //     ->sum('mrd_order_quantity');
 
-        $totalQuantity = DB::table('mrd_order')
-            ->whereIn('mrd_order_id', [/* array of mrd_order_ids */])
-            ->sum('mrd_order_quantity');
+        function getOrderTotals($order)
+        {
+            $totals = DB::table('mrd_order')
+                ->where('mrd_order_date', $order->mrd_order_date)
+                ->where('mrd_order_menu_id', $order->mrd_order_menu_id)
+                ->where(
+                    'mrd_order_status',
+                    'pending'
+                )
+                ->selectRaw('SUM(mrd_order_quantity) as total_quantity, SUM(mrd_order_mealbox) as total_mealbox')
+                ->first();
 
+            return [
+                'total_quantity' => (int) $totals->total_quantity,
+                'total_mealbox' => (int) $totals->total_mealbox,
+            ];
+        }
+
+
+        // function getMenuDetails($menuId)
+        // {
+        //     return DB::table('mrd_menu')
+        //         ->where('mrd_menu_id', $menuId)
+        //         ->first();
+        // }
+
+
+        function getFoodDetailsByMenu($menuId)
+        {
+            // Get the menu details
+            $menu = DB::table('mrd_menu')
+                ->where('mrd_menu_id', $menuId)
+                ->first();
+
+            if ($menu) {
+                // Explode the food IDs into an array
+                $foodIds = explode(',', $menu->mrd_menu_food_id);
+
+                // Fetch the food details
+                $foodDetails = DB::table('mrd_food')
+                    ->whereIn('mrd_food_id', $foodIds)
+                    ->get();
+
+                return $foodDetails;
+            } else {
+                return null;
+            }
+        }
+        // dd(getFoodDetailsByMenu(14));
 
         $groupedOrders = [];
 
@@ -89,25 +139,20 @@ class ChefController extends Controller
             $period = $order->mrd_menu_period;
 
             // Initialize total quantity if not already set
-            if (!isset($groupedOrders[$date][$period]['total_quantity'])) {
-                $groupedOrders[$date][$period]['total_quantity'] = 0;
-            }
+            // if (!isset($groupedOrders[$date][$period]['total_quantity'])) {
+            //     $groupedOrders[$date][$period]['total_quantity'] = 0;
+            // }
 
-            // dd($order->mrd_order_quantity);
-            // Add the order quantity to the total quantity
-            $groupedOrders[$date][$period]['total_quantity'] = $order->mrd_order_quantity;
+
+            $totals = getOrderTotals($order);
+            $groupedOrders[$date][$period]['total_quantity'] = $totals['total_quantity'];
+            $groupedOrders[$date][$period]['total_mealbox'] = $totals['total_mealbox'];
+            // $groupedOrders[$date][$period]['total_quantity'] = getOrderTotals($order);
+            $groupedOrders[$date][$period]['menu_id'] = $order->mrd_order_menu_id;
+
+            $foodItems = getFoodDetailsByMenu($order->mrd_order_menu_id);
+            $groupedOrders[$date][$period]['food_items'] = $foodItems;
         }
-
-        // // Remove detailed order data, keeping only total quantity
-        // foreach ($groupedOrders as $date => $periods) {
-        //     foreach ($periods as $period => $data) {
-        //         $groupedOrders[$date][$period] = [
-        //             'total_quantity' => $data['total_quantity']
-        //         ];
-        //     }
-        // }
-
-
 
 
         return response()->json($groupedOrders);
@@ -115,148 +160,7 @@ class ChefController extends Controller
 
 
 
-    public function orderListChefNow2()
-    {
-        // Get today's date in YYYY-MM-DD format
-        $today = Carbon::today()->format('Y-m-d');
-        $today_day_name = strtolower(Carbon::parse($today)->format('D'));
 
-        // Fetch menu and orders, including days without orders
-        $menus = DB::table('mrd_menu')
-            ->select('mrd_menu_day', 'mrd_menu_period', 'mrd_menu_food_id', 'mrd_menu_price')
-            ->where('mrd_menu_day', $today_day_name)
-            ->get();
-
-        // Fetch food details and map them by their IDs
-        $foods = DB::table('mrd_food')
-            ->select('mrd_food_id', 'mrd_food_name', 'mrd_food_desc', 'mrd_food_price', 'mrd_food_img', 'mrd_food_type')
-            ->get()
-            ->keyBy('mrd_food_id')
-            ->toArray();
-
-        // Fetch orders
-        $orders = DB::table('mrd_order')
-            ->select('mrd_order.mrd_order_date', 'mrd_menu.mrd_menu_period', 'mrd_menu.mrd_menu_food_id', 'mrd_order.mrd_order_quantity', 'mrd_order.mrd_order_total_price', 'mrd_user.mrd_user_mealbox')
-            ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
-            ->leftJoin('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
-            ->where('mrd_order.mrd_order_status', '=', 'pending')
-            ->where('mrd_order.mrd_order_date', '=', $today)
-            ->get();
-
-        $result = [];
-
-        foreach ($menus as $menu) {
-            $day = $today_day_name;
-            $period = $menu->mrd_menu_period;
-            $food_ids = explode(',', $menu->mrd_menu_food_id); // Split food_ids into an array
-            $menu_price = $menu->mrd_menu_price;
-
-            // Initialize date entry if not exists
-            if (!isset($result[$today])) {
-                $result[$today] = [
-                    'day' => $day,
-                    'lunch' => [
-                        'food_id' => [],
-                        'total_quantity' => 0,
-                        'mrd_menu_price' => 0,
-                        'mrd_order_total_price' => 0,
-                        'total_mealbox' => 0  // Initialize total mealbox count
-                    ],
-                    'dinner' => [
-                        'food_id' => [],
-                        'total_quantity' => 0,
-                        'mrd_menu_price' => 0,
-                        'mrd_order_total_price' => 0,
-                        'total_mealbox' => 0  // Initialize total mealbox count
-                    ]
-                ];
-            }
-
-            // Populate food details
-            $food_details = [];
-            foreach ($food_ids as $food_id) {
-                $food_id = trim($food_id); // Trim any leading/trailing whitespace
-                if (isset($foods[$food_id])) {
-                    $food_details[] = [
-                        'name' => $foods[$food_id]->mrd_food_name,
-                        'description' => $foods[$food_id]->mrd_food_desc,
-                        'price' => $foods[$food_id]->mrd_food_price,
-                        'image' => $foods[$food_id]->mrd_food_img,
-                        'type' => $foods[$food_id]->mrd_food_type
-                    ];
-                }
-            }
-
-            if ($period === 'lunch') {
-                $result[$today]['lunch']['food_id'] = array_filter(array_unique($food_details, SORT_REGULAR));
-                $result[$today]['lunch']['mrd_menu_price'] = $menu_price;
-            } elseif ($period === 'dinner') {
-                $result[$today]['dinner']['food_id'] = array_filter(array_unique($food_details, SORT_REGULAR));
-                $result[$today]['dinner']['mrd_menu_price'] = $menu_price;
-            }
-        }
-
-        // Aggregate orders and update the result
-        foreach ($orders as $order) {
-            $period = $order->mrd_menu_period;
-            $food_ids = explode(',', $order->mrd_menu_food_id); // Split food_ids into an array
-            $quantity = $order->mrd_order_quantity;
-            $order_total_price = $order->mrd_order_total_price;
-            $user_mealbox = $order->mrd_user_mealbox;
-
-            // Aggregate quantities and total price based on menu period
-            if ($period === 'lunch') {
-                foreach ($food_ids as $food_id) {
-                    $food_id = trim($food_id); // Trim any leading/trailing whitespace
-                    if (!empty($food_id)) {
-                        $food_detail = [
-                            'name' => $foods[$food_id]->mrd_food_name,
-                            'description' => $foods[$food_id]->mrd_food_desc,
-                            'price' => $foods[$food_id]->mrd_food_price,
-                            'image' => $foods[$food_id]->mrd_food_img,
-                            'type' => $foods[$food_id]->mrd_food_type
-                        ];
-                        if (!in_array($food_detail, $result[$today]['lunch']['food_id'])) {
-                            $result[$today]['lunch']['food_id'][] = $food_detail;
-                        }
-                    }
-                }
-                $result[$today]['lunch']['total_quantity'] += $quantity;
-                $result[$today]['lunch']['mrd_order_total_price'] += $order_total_price;
-
-                // Count mealboxes for lunch if user prefers
-                if ($user_mealbox == 1) {
-                    $result[$today]['lunch']['total_mealbox']++;
-                }
-            } elseif ($period === 'dinner') {
-                foreach ($food_ids as $food_id) {
-                    $food_id = trim($food_id); // Trim any leading/trailing whitespace
-                    if (!empty($food_id)) {
-                        $food_detail = [
-                            'name' => $foods[$food_id]->mrd_food_name,
-                            'description' => $foods[$food_id]->mrd_food_desc,
-                            'price' => $foods[$food_id]->mrd_food_price,
-                            'image' => $foods[$food_id]->mrd_food_img,
-                            'type' => $foods[$food_id]->mrd_food_type
-                        ];
-                        if (!in_array($food_detail, $result[$today]['dinner']['food_id'])) {
-                            $result[$today]['dinner']['food_id'][] = $food_detail;
-                        }
-                    }
-                }
-                $result[$today]['dinner']['total_quantity'] += $quantity;
-                $result[$today]['dinner']['mrd_order_total_price'] += $order_total_price;
-
-                // Count mealboxes for dinner if user prefers
-                if ($user_mealbox == 1) {
-                    $result[$today]['dinner']['total_mealbox']++;
-                }
-            }
-        }
-
-        // Return JSON response
-        return response()->json($result);
-    }
 
     //MARK: ChefLater
     public function orderListChefLater()

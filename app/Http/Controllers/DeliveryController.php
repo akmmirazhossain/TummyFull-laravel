@@ -281,13 +281,43 @@ class DeliveryController extends Controller
         //     }
         // } 
         elseif ($delivStatus == 'cancelled') {
-            $notif_message =  "Your " . $menuPeriod . " was canceled.";
-            $notif_credit_calc =
-                null;
+            $notif_message =  "Your " . $menuPeriod . " was canceled by the delivery person.";
+
+
+            //ORDER DELIVE STATUS UPDATE
+            $delivUpdate = DB::table('mrd_order')
+                ->where('mrd_order_id', $orderId)
+                ->update(['mrd_order_status' => $delivStatus]);
+
+
+            //NOTIFICATION INSERT
+            $notifInsert = DB::table('mrd_notification')->insert([
+                'mrd_notif_user_id' =>
+                $userId,
+                'mrd_notif_message' => $notif_message,
+
+                'mrd_notif_type' => 'order'
+            ]);
         } elseif ($delivStatus == 'unavailable') {
-            $notif_message =  "Unable to deliver your " . $menuPeriod . " due to unavailability.";
-            $notif_credit_calc =
-                null;
+            $notif_message =  ucfirst($menuPeriod) . " delivery was unsuccessful due to customer's unavailability.";
+
+            //UPCOMING penalty charge section here
+
+
+            //ORDER DELIVE STATUS UPDATE
+            $delivUpdate = DB::table('mrd_order')
+                ->where('mrd_order_id', $orderId)
+                ->update(['mrd_order_status' => $delivStatus]);
+
+
+            //NOTIFICATION INSERT
+            $notifInsert = DB::table('mrd_notification')->insert([
+                'mrd_notif_user_id' =>
+                $userId,
+                'mrd_notif_message' => $notif_message,
+
+                'mrd_notif_type' => 'order'
+            ]);
         }
 
 
