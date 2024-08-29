@@ -137,12 +137,23 @@ class DeliveryController extends Controller
             //$notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
             $notif_credit_calc = null;
 
+            //userCredit = 100
+            //orderTotalPrice = 100
 
+            //userCreditNew = 50
+            //cashToCollect = 0
 
             if ($userCredit >= $orderTotalPrice) {
                 $userCreditNew = $userCredit - $orderTotalPrice;
                 $cashToCollect = 0;
-            } else {
+            }
+
+            //userCredit = 100
+            //orderTotalPrice = 150
+
+            //userCreditNew = 50
+            //cashToCollect = 0
+            else {
                 $userCreditNew = 0;
                 $cashToCollect = $orderTotalPrice - $userCredit;
             }
