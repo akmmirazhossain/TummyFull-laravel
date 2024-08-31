@@ -140,7 +140,7 @@ class DeliveryController extends Controller
             //userCredit = 100
             //orderTotalPrice = 100
 
-            //userCreditNew = 50
+            //userCreditNew = 0
             //cashToCollect = 0
 
             if ($userCredit >= $orderTotalPrice) {
