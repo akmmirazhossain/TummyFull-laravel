@@ -17,17 +17,18 @@ class ChefController extends Controller
         $orderperiod = "all";
         $orderarea = "all";
 
-        $orderlistof = "todayafter";
-        $orderstatus = "pending";
-        $orderperiod = "all";
-        $orderarea = "all";
+
+        $TFLoginToken = $request->query('TFLoginToken');
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+
+
 
         // Get the current date
         $today = Carbon::now()->format('Y-m-d');
 
         // Query the database based on the $orderlistof value
         $ordersQuery = DB::table('mrd_order')
-            // ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
+            ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
             ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
             // ->join('mrd_area', 'mrd_user.mrd_user_area', '=', 'mrd_area.mrd_area_id')
             // ->join('mrd_payment', 'mrd_order.mrd_order_id', '=', 'mrd_payment.mrd_payment_order_id')
@@ -53,6 +54,11 @@ class ChefController extends Controller
 
             )
             ->orderBy('mrd_order.mrd_order_date', 'asc');
+
+
+        if ($userId != "") {
+            $ordersQuery->where('mrd_user.mrd_user_chef_id', '=', $userId);
+        }
 
         if ($orderarea !== "all") {
             $ordersQuery->where('mrd_area.mrd_area_id', '=', $orderarea);
@@ -101,12 +107,7 @@ class ChefController extends Controller
         }
 
 
-        // function getMenuDetails($menuId)
-        // {
-        //     return DB::table('mrd_menu')
-        //         ->where('mrd_menu_id', $menuId)
-        //         ->first();
-        // }
+
 
 
         function getFoodDetailsByMenu($menuId)
@@ -138,10 +139,6 @@ class ChefController extends Controller
             $date = $order->mrd_order_date;
             $period = $order->mrd_menu_period;
 
-            // Initialize total quantity if not already set
-            // if (!isset($groupedOrders[$date][$period]['total_quantity'])) {
-            //     $groupedOrders[$date][$period]['total_quantity'] = 0;
-            // }
 
 
             $totals = getOrderTotals($order);
@@ -158,119 +155,53 @@ class ChefController extends Controller
         return response()->json($groupedOrders);
     }
 
-
-
-
-
-    //MARK: ChefLater
-    public function orderListChefLater()
+    public function chefOrderHistory(Request $request)
     {
 
-        // Get orders with corresponding menu details
-        $orders = DB::table('mrd_order')
-            ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
-            ->selectRaw('
-        mrd_order_date,
-        mrd_menu_period,
-        GROUP_CONCAT(DISTINCT mrd_menu_food_id) as food_ids,
-        SUM(mrd_order_quantity) as total_quantity,
-        MAX(mrd_menu.mrd_menu_price) as menu_price,
-        CAST(SUM(mrd_order_total_price) AS UNSIGNED) as total_price
-    ')
-            ->where('mrd_order_date', '>=', Carbon::now()->addDay()->toDateString())
-            ->where('mrd_order_status', 'pending')
-            ->groupBy('mrd_order_date', 'mrd_menu_period')
-            ->orderBy('mrd_order_date', 'ASC')
-            ->get();
+        $TFLoginToken = $request->query('TFLoginToken');
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
 
-        // Transform orders into a nested structure by date and period
-        $transformedOrders = [];
-        foreach ($orders as $order) {
-            $date = $order->mrd_order_date;
-            $period = $order->mrd_menu_period;
 
-            if (!isset($transformedOrders[$date])) {
-                $transformedOrders[$date] = [];
-            }
 
-            // Convert food IDs to food names
-            $foodIds = array_unique(array_filter(explode(',', $order->food_ids)));
-            $foodNames = DB::table('mrd_food')
-                ->whereIn('mrd_food_id', $foodIds)
-                ->pluck('mrd_food_name')
-                ->toArray();
+        $orders = DB::select(
+            'SELECT ord.*, 
+            s.mrd_setting_commission_chef,
+            (ord.mrd_order_quantity * s.mrd_setting_commission_chef) AS total_commission 
+     FROM mrd_order ord
+     JOIN mrd_user user ON ord.mrd_order_user_id = user.mrd_user_id
+     JOIN mrd_setting s ON 1 = 1  -- Assuming there is only one setting, adjust as needed
+     WHERE user.mrd_user_chef_id = ? 
+     AND ord.mrd_order_status = "delivered"
+     ORDER BY ord.mrd_order_date DESC',
+            [$userId]
+        );
 
-            $transformedOrders[$date][$period] = [
-                'food_names' => $foodNames,
-                'total_quantity' => $order->total_quantity ?? 0,
-                'menu_price' => $order->menu_price ?? 0,
-                'total_price' => $order->total_price ?? 0,
-            ];
-        }
 
-        // Get all menu details to ensure all periods (lunch and dinner) are shown for each day
-        $menus = DB::table('mrd_menu')
-            ->select('mrd_menu_day', 'mrd_menu_food_id', 'mrd_menu_period', 'mrd_menu_price')
-            ->get();
 
-        // Create a map for menus by day and period
-        $menuMap = [];
-        foreach ($menus as $menu) {
-            $day = $menu->mrd_menu_day;
-            $period = $menu->mrd_menu_period;
+        // Return the result as JSON
+        return response()->json($orders);
+    }
 
-            if (!isset($menuMap[$day])) {
-                $menuMap[$day] = [];
-            }
 
-            // Convert menu food IDs to food names
-            $menuFoodIds = array_unique(array_filter(explode(',', $menu->mrd_menu_food_id)));
-            $menuFoodNames = DB::table('mrd_food')
-                ->whereIn('mrd_food_id', $menuFoodIds)
-                ->pluck('mrd_food_name')
-                ->toArray();
+    public function chefPaymentHistory(Request $request)
+    {
 
-            $menuMap[$day][$period] = [
-                'food_names' => $menuFoodNames,
-                'menu_price' => $menu->mrd_menu_price,
-            ];
-        }
+        $TFLoginToken = $request->query('TFLoginToken');
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
 
-        // Ensure each date has lunch and dinner periods from the menu map
-        foreach ($menuMap as $day => $periods) {
-            $date = now()->next($day)->toDateString(); // Find the next date for the given day
 
-            if (!isset($transformedOrders[$date])) {
-                $transformedOrders[$date] = [];
-            }
 
-            foreach (['lunch', 'dinner'] as $period) {
-                if (!isset($transformedOrders[$date][$period])) {
-                    $transformedOrders[$date][$period] = [
-                        'food_names' => $periods[$period]['food_names'] ?? [],
-                        'total_quantity' => 0,
-                        'menu_price' => $periods[$period]['menu_price'] ?? 0,
-                        'total_price' => 0,
-                    ];
-                } else {
-                    // Update food_names and menu_price with default if missing
-                    $transformedOrders[$date][$period]['food_names'] = array_unique(array_merge($periods[$period]['food_names'] ?? [], $transformedOrders[$date][$period]['food_names']));
-                    $transformedOrders[$date][$period]['menu_price'] = $transformedOrders[$date][$period]['menu_price'] ?: ($periods[$period]['menu_price'] ?? 0);
-                }
-            }
-        }
+        $payments = DB::select(
+            'SELECT * 
+     FROM mrd_payment 
+     WHERE mrd_payment_user_id = ? 
+     ORDER BY mrd_payment_id ASC',
+            [$userId]
+        );
 
-        // Reorder the array to ensure 'lunch' appears before 'dinner'
-        foreach ($transformedOrders as $date => &$periods) {
-            if (isset($periods['lunch']) && isset($periods['dinner'])) {
-                $periods = ['lunch' => $periods['lunch'], 'dinner' => $periods['dinner']];
-            } elseif (isset($periods['lunch'])) {
-                $periods = ['lunch' => $periods['lunch']];
-            } elseif (isset($periods['dinner'])) {
-                $periods = ['dinner' => $periods['dinner']];
-            }
-        }
 
-        return response()->json($transformedOrders);
+
+        // Return the result as JSON
+        return response()->json($payments);
     }
 }

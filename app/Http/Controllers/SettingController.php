@@ -5,7 +5,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Models\DeliveryMod;
+
 use App\Models\SettingMod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -48,7 +48,12 @@ class SettingController extends Controller
         // Create an array to hold the output
         $output = [
             "announcement" => $mrdSetting->mrd_setting_announcement,
-            "order_max_days" => $mrdSetting->mrd_setting_order_max_days,
+            // "mrd_setting_meal_price" => $mrdSetting->mrd_setting_meal_price,
+            // "mrd_setting_mealbox_price" => $mrdSetting->mrd_setting_mealbox_price,
+            // "mrd_setting_commission_chef" => $mrdSetting->mrd_setting_commission_chef,
+            // "mrd_setting_commission_delivery" => $mrdSetting->mrd_setting_commission_delivery,
+            // "mrd_setting_commission_supplier" => $mrdSetting->mrd_setting_commission_supplier,
+            // "order_max_days" => $mrdSetting->mrd_setting_order_max_days,
             "time_limit_lunch" => $timeLimitLunch,
             "time_limit_dinner" => $timeLimitDinner,
             "time_limit_lunch_24h" => $timeLimitLunch24h,
@@ -57,9 +62,9 @@ class SettingController extends Controller
             $mrdSetting->mrd_setting_delivery_time_lunch,
             "delivery_time_dinner" =>
             $mrdSetting->mrd_setting_delivery_time_dinner,
-            "delivery_charge" => $mrdSetting->mrd_setting_delivery_charge,
-            "quantity_min" => $mrdSetting->mrd_setting_quantity_min,
-            "quantity_max" => $mrdSetting->mrd_setting_quantity_max,
+            // "delivery_charge" => $mrdSetting->mrd_setting_delivery_charge,
+            // "quantity_min" => $mrdSetting->mrd_setting_quantity_min,
+            // "quantity_max" => $mrdSetting->mrd_setting_quantity_max,
             "server_time" => $serverTime,
             "server_time_24h" => $serverTime24h,
             "server_date" => $serverDate,

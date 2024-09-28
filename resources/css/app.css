@@ -1,3 +1,135 @@
+@import "/node_modules/@fortawesome/fontawesome-free/css/all.min.css";
+
+/* @import "daisyui"; */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.text_black {
+    color: #333333;
+}
+
+.bg_green {
+    background-color: #004225;
+}
+
+.text_green {
+    color: #004225;
+}
+
+.bg_beige {
+    background-color: #f5f5dc;
+}
+
+.bg_orange {
+    background-color: #ffb000;
+}
+
+.bg_light_orange {
+    /* Puzzler */
+    /* background-color: blue; */
+    background-color: #ffcf9d;
+}
+
+.h1_akm {
+    @apply text-2xl sm:text-2xl lg:text-3xl py-4 lg:py-6 font-bold;
+}
+
+.h2_akm {
+    @apply text-lg sm:text-xl md:text-2xl lg:text-2xl xl:text-2xl font-semibold;
+}
+
+.h3_akm {
+    @apply text-lg sm:text-lg md:text-lg lg:text-xl xl:text-xl;
+}
+
+.h4_akm {
+    @apply text-xs lg:text-sm;
+}
+
+.h4info_akm {
+    @apply text-xs text-gray-500 lg:text-sm;
+}
+
+.pad_akm {
+    @apply p-2 sm:p-2 md:p-3 lg:p-4 xl:p-4;
+}
+
+.py_akm {
+    @apply py-2 sm:py-2 md:py-3 lg:py-4;
+}
+
+.px_akm {
+    @apply px-2 sm:px-2 md:px-3 lg:px-4;
+}
+
+.pl_akm {
+    @apply pl-2 sm:pl-2 md:pl-3 lg:pl-4;
+}
+
+.pr_akm {
+    @apply pr-2 sm:pr-2 md:pr-3 lg:pr-4;
+}
+
+.pt_akm {
+    @apply pt-2 sm:pt-2 md:pt-3 lg:pt-4;
+}
+
+.pb_akm {
+    @apply pb-2 sm:pb-2 md:pb-3 lg:pb-4;
+}
+
+.mb_akm {
+    @apply mb-6;
+}
+
+.mt_akm {
+    @apply mt-2;
+}
+
+.mx_akm {
+    @apply mx-6;
+}
+
+.my_akm {
+    @apply my-4 md:my-6;
+}
+
+.my3_akm {
+    @apply mt-3 mb-3;
+}
+
+.gap_akm {
+    @apply gap-2;
+    @apply md:gap-4;
+}
+
+.shadow_akm {
+    @apply shadow-md;
+}
+
+.shadow_inner_akm {
+    box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.shadow_text_akm {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.shadow_text_white_akm {
+    text-shadow: 2px 2px 4px rgba(243, 243, 243, 0.9);
+}
+
+.rounded_akm {
+    @apply rounded-2xl;
+    @apply md:rounded-3xl;
+}
+
+.rounded_top_akm {
+    @apply rounded-t-3xl;
+}
+
+.card_akm {
+    @apply bg-gray-50   shadow_akm rounded_akm;
+}

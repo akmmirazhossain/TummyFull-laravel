@@ -3,12 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-
-use App\Models\SettingMod;
-
 use Illuminate\Http\Request;
-use App\Models\OrderMod;
-
 
 class UserController extends Controller
 {
@@ -49,6 +44,7 @@ class UserController extends Controller
                 'first_name' => $user->mrd_user_first_name,
                 'phone' => $user->mrd_user_phone,
                 'address' => $user->mrd_user_address,
+                'user_type' => $user->mrd_user_type,
                 'email' => $user->mrd_user_email,
                 'mrd_user_mealbox' => $user->mrd_user_mealbox,
                 'mrd_user_credit' => $user->mrd_user_credit,

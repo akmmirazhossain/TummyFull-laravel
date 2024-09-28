@@ -83,7 +83,10 @@ class PhoneVerificationController extends Controller
             ]);
 
             // Return a success message
-            return response()->json(['success' => 'Phone number does not exist. New user created and OTP generated successfully'], 201);
+            return response()->json([
+                'success' => 'Phone number does not exist. New user created and OTP generated successfully',
+                'new_user' => 'yes'
+            ], 201);
         }
     }
 

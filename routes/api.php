@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\ApiController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -23,7 +23,7 @@ use App\Http\Controllers\ApiController;
 
 // routes/api.php
 
-Route::get('items', [ApiController::class, 'getItems']);
+
 
 // routes/api.php
 
@@ -71,17 +71,20 @@ Route::get('/mealbook', [LogController::class, 'mealBook']);
 use App\Http\Controllers\ChefController;
 
 Route::get('/orderlist-chef-now', [ChefController::class, 'orderListChefNow']);
-Route::get('/orderlist-chef-later', [ChefController::class, 'orderListChefLater']);
-Route::get('/orderlist-chef-test', [ChefController::class, 'orderListChefTest']);
+Route::get('/chef-order-history', [ChefController::class, 'chefOrderHistory']);
+Route::get('/chef-payment-history', [ChefController::class, 'chefPaymentHistory']);
+// Route::get('/orderlist-chef-later', [ChefController::class, 'orderListChefLater']);
+// Route::get('/orderlist-chef-test', [ChefController::class, 'orderListChefTest']);
 
 
 use App\Http\Controllers\DeliveryController;
 
-Route::get('/delivery-list', [DeliveryController::class, 'deliveryList']);
-Route::get('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
+Route::post('/delivery-list', [DeliveryController::class, 'deliveryList']);
+Route::post('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
 
 
 use App\Http\Controllers\NotificationController;
 
 Route::post('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
 Route::get('/notif-get', [NotificationController::class, 'notifGet']);
+Route::get('/notif-seen', [NotificationController::class, 'notifSeen']);

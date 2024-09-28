@@ -7,251 +7,227 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\NotificationController;
 use \App\Models\OrderMod;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Exception;
 
 
 class OrderController extends Controller
 {
 
-    protected $notificationController;
-
-    public function __construct(NotificationController $notificationController)
-    {
-        $this->notificationController = $notificationController;
-    }
 
 
     //MARK: PLACE ORDER
     public function orderPlace(Request $request)
     {
 
-
-
-        try {
-
-
-
-
-            $menuController = new MenuController();
-            $menuId = $request->input('menuId');
-            $date = $request->input('date');
-            $price = $request->input('price');
-            $TFLoginToken = $request->input('TFLoginToken');
-            $switchValue = $request->input('switchValue');
-            $quantity = $request->input('quantity');
-
-
-
-            //NOTIF DATA PREP
-            $notif_data = [
-                'menuId' => $menuId,
-                'date' => $date,
-                'price' => $price,
-                'TFLoginToken' => $TFLoginToken,
-                'switchValue' => $switchValue,
-                'quantity' => $quantity
-            ];
-
-            //NOTIFCATION INSERT
-            $notifRequest = new Request($notif_data);
-            $this->notificationController->notifOrderPlace($notifRequest);
-
-
-            // Fetch user ID based on session token
-            $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
-                ->value('mrd_user_id');
-
-            // Check if the user ID is fetched successfully
-            if (!$userId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to retrieve user ID '
-                ]);
-            }
+        $menuController = new MenuController();
+        $menuId = $request->input('menuId');
+        $date = $request->input('date');
+        $price = $request->input('price');
+        $TFLoginToken = $request->input('TFLoginToken');
+        $switchValue = $request->input('switchValue');
+        $quantity = $request->input('quantity');
 
 
 
 
 
-            // Insert Data if switchValue is true
-            if ($switchValue == '1') {
+        // Fetch user ID based on session token
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
 
-                $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
-
-                //IF ORDER EXISTS
-                if ($orderExistance == "enabled") {
-
-                    //GET CASH TO GET VALUE
-                    $userCredit = DB::table('mrd_user')
-                        ->where('mrd_user_id', $userId)
-                        ->value('mrd_user_credit');
-
-                    $subtotal = $userCredit - $price;
-
-                    if ($subtotal > 0) {
-                        $cash_to_get = 0;
-                    } else {
-
-                        $cash_to_get = abs($subtotal);
-                    }
-
-
-                    //UPDATE ORDER IF ORDER EXISTS
-                    $updatedRows = OrderMod::where(
-                        'mrd_order_menu_id',
-                        $menuId
-                    )
-                        ->where('mrd_order_user_id', $userId)
-                        ->where('mrd_order_date', $date)
-                        ->update([
-                            'mrd_order_total_price' => $price,
-                            'mrd_order_mealbox' => $this->getUserMealboxById($userId),
-                            'mrd_order_quantity' => $quantity,
-                            'mrd_order_cash_to_get' => $cash_to_get,
-                            'mrd_order_status' => 'pending'
-                        ]);
-
-                    $orderId = DB::table('mrd_order')
-                        ->where('mrd_order_menu_id', $menuId)
-                        ->where('mrd_order_user_id', $userId)
-                        ->where('mrd_order_date', $date)
-                        ->pluck('mrd_order_id')
-                        ->first();
+        // Check if the user ID is fetched successfully
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to retrieve user ID '
+            ]);
+        }
 
 
 
+        // Insert Data if switchValue is true
+        if ($switchValue == '1') {
 
+            $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
 
-                    //UPDATE PAYMENT IF PAYMENT EXISTS
-                    $userCreditUpdate = DB::table('mrd_payment')
-                        ->where('mrd_payment_order_id', $orderId)
-                        ->update(['mrd_payment_amount' => $price]);
+            //IF ORDER EXISTS
+            if ($orderExistance == "enabled") {
 
+                //GET CASH TO GET VALUE
+                $userCredit = DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->value('mrd_user_credit');
 
-                    // Return a response based on update result
-                    if ($updatedRows > 0) {
-                        return response()->json([
-                            'success' => true,
-                            'message' => 'Order updated successfully',
-                            'updatedRows' => $updatedRows
-                        ]);
-                    } else {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'No matching order found to update'
-                        ]);
-                    }
+                $subtotal = $userCredit - $price;
+
+                if ($subtotal > 0) {
+                    $cash_to_get = 0;
                 } else {
 
-
-                    //NEW ORDER, INSERT
-                    $orderId = DB::table('mrd_order')
-                        ->where('mrd_order_menu_id', $menuId)
-                        ->where('mrd_order_user_id', $userId)
-                        ->where('mrd_order_date', $date)
-                        ->pluck('mrd_order_id')
-                        ->first();
-
-                    $userCredit = DB::table('mrd_user')
-                        ->where('mrd_user_id', $userId)
-                        ->value('mrd_user_credit');
-
-                    $orderTotalPrice = DB::table('mrd_order')
-                        ->where('mrd_order_id', $orderId)
-                        ->value('mrd_order_total_price');
+                    $cash_to_get = abs($subtotal);
+                }
 
 
-                    $orderQuantity = DB::table('mrd_order')
-                        ->where('mrd_order_id', $orderId)
-                        ->value('mrd_order_quantity');
-
-                    $menuPeriod = DB::table('mrd_menu')
-                        ->where('mrd_menu_id', $menuId)
-                        ->value('mrd_menu_period');
-
-                    $subtotal = $userCredit - $price;
-
-                    if ($subtotal > 0) {
-                        $cash_to_get = 0;
-                    } else {
-
-                        $cash_to_get = abs($subtotal);
-                    }
-
-
-
-                    //MRD_ORDER INSERT DATA, NEW ORDER
-                    $order = DB::table('mrd_order')->insert([
-                        'mrd_order_user_id' => $userId,
-                        'mrd_order_menu_id' => $menuId,
-                        'mrd_order_quantity' => $quantity,
-                        'mrd_order_mealbox' => $this->getUserMealboxById($userId),
+                //UPDATE ORDER IF ORDER EXISTS
+                $updatedRows = DB::table('mrd_order')
+                    ->where('mrd_order_menu_id', $menuId)
+                    ->where('mrd_order_user_id', $userId)
+                    ->where('mrd_order_date', $date)
+                    ->update([
                         'mrd_order_total_price' => $price,
+                        'mrd_order_mealbox' => $this->getUserMealboxById($userId),
+                        'mrd_order_quantity' => $quantity,
                         'mrd_order_cash_to_get' => $cash_to_get,
-                        'mrd_order_date' => $date
+                        'mrd_order_status' => 'pending'
                     ]);
 
 
-                    // //NOTIF DATA PREP
-                    // $notif_data = [
-                    //     'menuId' => $menuId,
-                    //     'date' => $date,
-                    //     'price' => $price,
-                    //     'TFLoginToken' => $TFLoginToken,
-                    //     'switchValue' => $switchValue,
-                    //     'quantity' => $quantity
-                    // ];
-
-                    // //NOTIFCATION INSERT
-                    // $notifRequest = new Request($notif_data);
-                    // return $this->notificationController->notifOrderPlace($notifRequest);
-
-                    // //PAYMENT INSERT ON NEW ORDER
-                    $paymentInsert = DB::table('mrd_payment')->insert([
-                        'mrd_payment_user_id' =>
-                        $userId,
-                        'mrd_payment_order_id' =>
-                        $orderId,
-                        'mrd_payment_for' =>
-                        'order',
-                        'mrd_payment_amount' =>
-                        $price
-                    ]);
+                $orderId = DB::table('mrd_order')
+                    ->where('mrd_order_menu_id', $menuId)
+                    ->where('mrd_order_user_id', $userId)
+                    ->where('mrd_order_date', $date)
+                    ->pluck('mrd_order_id')
+                    ->first();
 
 
+                //INSERT NOTIFICATION
+                $notificationController = app(NotificationController::class);
+
+                // Data to send
+                $notif_data = compact(
+                    'menuId',
+                    'date',
+                    'price',
+                    'orderId',
+                    'TFLoginToken',
+                    'switchValue',
+                    'quantity'
+                );
+
+                // Create and send the request
+                $result = $notificationController->notifOrderPlace(new Request($notif_data));
 
 
-                    // Return a success response
+                // Return a response based on update result
+                if ($updatedRows > 0) {
                     return response()->json([
                         'success' => true,
-                        'message' => 'Order inserted successfully',
-                        'orderId' => $orderId,
-                        'data' => $order
+                        'message' => 'Order updated successfully',
+                        'updatedRows' => $updatedRows,
+                        'orderId' => $orderId
+
+                    ]);
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No matching order found to update'
                     ]);
                 }
             } else {
-                $updatedRows = OrderMod::where(
-                    'mrd_order_menu_id',
-                    $menuId
-                )
-                    ->where('mrd_order_user_id', $userId)
-                    ->where('mrd_order_date', $date)
-                    ->update(['mrd_order_status' => 'cancelled']);
 
+
+                //NEW ORDER, INSERT
+
+                $userCredit = DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->value('mrd_user_credit');
+
+
+
+                //CALCULATE CASH TO GET for mrd_order table insert
+                $subtotal = $userCredit - $price;
+
+                if ($subtotal > 0) {
+                    $cash_to_get = 0;
+                } else {
+
+                    $cash_to_get = abs($subtotal);
+                }
+
+
+
+
+                //MRD_ORDER INSERT DATA, NEW ORDER
+                $orderId = DB::table('mrd_order')->insertGetId([
+                    'mrd_order_user_id' => $userId,
+                    'mrd_order_menu_id' => $menuId,
+                    'mrd_order_quantity' => $quantity,
+                    'mrd_order_mealbox' => $this->getUserMealboxById($userId),
+                    'mrd_order_total_price' => $price,
+                    'mrd_order_cash_to_get' => $cash_to_get,
+                    'mrd_order_date' => $date
+                ]);
+
+                //INSERT NOTIFICATION
+                $notificationController = app(NotificationController::class);
+
+                // Data to send
+                $notif_data = compact(
+                    'menuId',
+                    'date',
+                    'price',
+                    'orderId',
+                    'TFLoginToken',
+                    'switchValue',
+                    'quantity'
+                );
+
+                // Create and send the request
+                $result = $notificationController->notifOrderPlace(new Request($notif_data));
+
+
+
+
+                // Return a success response
                 return response()->json([
                     'success' => true,
-                    'message' => 'Order cancelled successfully',
-                    'updatedRows' => $updatedRows
+                    'message' => 'Order inserted successfully',
+                    'orderId' => $orderId
 
                 ]);
             }
-        } catch (Exception $e) {
-            // Log the error
-            logger()->error('Order processing error: ' . $e->getMessage());
+        } else {
+            $updatedRows = OrderMod::where(
+                'mrd_order_menu_id',
+                $menuId
+            )
+                ->where('mrd_order_user_id', $userId)
+                ->where('mrd_order_date', $date)
+                ->update(['mrd_order_status' => 'cancelled']);
 
-            // Return an error response with JSON
-            return response()->json(['error' => $e->getMessage()], 500);
+            $orderId = DB::table('mrd_order')
+                ->where('mrd_order_menu_id', $menuId)
+                ->where('mrd_order_user_id', $userId)
+                ->where('mrd_order_date', $date)
+                ->pluck('mrd_order_id')
+                ->first();
+
+
+            //INSERT NOTIFICATION
+            $notificationController = app(NotificationController::class);
+
+            // Data to send
+            $notif_data = compact(
+                'menuId',
+                'date',
+                'price',
+                'orderId',
+                'TFLoginToken',
+                'switchValue',
+                'quantity'
+            );
+
+            // Create and send the request
+            $result = $notificationController->notifOrderPlace(new Request($notif_data));
+
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order cancelled successfully',
+                'updatedRows' => $updatedRows
+
+            ]);
         }
     }
 
@@ -316,17 +292,13 @@ class OrderController extends Controller
             // NOTIFCATION UPDATE FOR QUANTITY
             $updateNotif = DB::table('mrd_notification')
                 ->where('mrd_notif_order_id', $orderId)
+                ->orderBy('mrd_notif_date_added', 'desc') // Assuming you have a 'created_at' column for determining the most recent
+                ->limit(1)
                 ->update([
                     'mrd_notif_quantity' => $quantityValue,
                     'mrd_notif_total_price' => $totalPrice,
                 ]);
 
-
-            //UPDATE PAYMENT IF PAYMENT EXISTS
-
-            $userCreditUpdate = DB::table('mrd_payment')
-                ->where('mrd_payment_order_id', $orderId)
-                ->update(['mrd_payment_amount' => $totalPrice]);
 
 
 

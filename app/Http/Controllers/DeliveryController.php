@@ -11,11 +11,15 @@ class DeliveryController extends Controller
     //MARK: deliveryList
     public function deliveryList(Request $request)
     {
-        // Set the variables for date criteria and order status
-        $orderlistof = "todayafter"; // Default to 'alltime' if not provided
+
+        $orderlistof = "todayafter";
         $orderstatus = "all";
         $orderperiod = "all";
         $orderarea = "all";
+        // Get the token from the Authorization header
+        $authorizationHeader = $request->header('Authorization');
+        $TFLoginToken = str_replace('Bearer ', '', $authorizationHeader); // Remove 'Bearer ' from the token
+        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
 
         // Get the current date
         $today = Carbon::now()->format('Y-m-d');
@@ -25,7 +29,11 @@ class DeliveryController extends Controller
             ->join('mrd_user', 'mrd_order.mrd_order_user_id', '=', 'mrd_user.mrd_user_id')
             ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
             ->join('mrd_area', 'mrd_user.mrd_user_area', '=', 'mrd_area.mrd_area_id')
-            // ->join('mrd_payment', 'mrd_order.mrd_order_id', '=', 'mrd_payment.mrd_payment_order_id')
+            ->join('mrd_user as delivery_user', function ($join) use ($userId) {
+                $join->on('delivery_user.mrd_user_chef_id', '=', 'mrd_user.mrd_user_chef_id')
+                    ->where('delivery_user.mrd_user_type', '=', 'delivery')
+                    ->where('delivery_user.mrd_user_id', '=', $userId);
+            })
             ->select(
                 'mrd_menu.mrd_menu_period',
                 'mrd_menu.mrd_menu_id',
@@ -40,13 +48,23 @@ class DeliveryController extends Controller
                 'mrd_user.mrd_user_address',
                 'mrd_user.mrd_user_phone',
                 'mrd_user.mrd_user_first_name',
-                'mrd_user.mrd_user_credit',
+                'mrd_user.mrd_user_type',
+                'mrd_user.mrd_user_chef_id',
+                'mrd_user.mrd_user_has_mealbox',
+                'mrd_user.mrd_user_mealbox_paid',
                 'mrd_user.mrd_user_delivery_instruction',
                 'mrd_area.mrd_area_name',
-                // 'mrd_payment.mrd_payment_amount'
-
+                'delivery_user.mrd_user_id as delivery_user_id'
             )
             ->orderBy('mrd_order.mrd_order_date', 'asc');
+
+
+
+
+        // if ($userid !== "25") {
+        //     $ordersQuery->where('md_user.mrd_area_id', '=', $orderarea);
+        // }
+
 
         if ($orderarea !== "all") {
             $ordersQuery->where('mrd_area.mrd_area_id', '=', $orderarea);
@@ -62,7 +80,7 @@ class DeliveryController extends Controller
             $ordersQuery->whereDate('mrd_order.mrd_order_date', '>=', $today);
         }
 
-        // Modify query based on the value of $orderstatus
+
         if ($orderstatus !== "all") {
             $ordersQuery->where('mrd_order.mrd_order_status', '=', $orderstatus);
         }
@@ -91,6 +109,11 @@ class DeliveryController extends Controller
             $groupedOrders[$date][$period][] = $order;
         }
 
+        // Sort the periods explicitly, to make sure "lunch" comes before "dinner"
+        foreach ($groupedOrders as $date => $periods) {
+            $groupedOrders[$date] = array_replace(['lunch' => [], 'dinner' => []], $periods);
+        }
+
         return response()->json($groupedOrders);
     }
 
@@ -102,11 +125,14 @@ class DeliveryController extends Controller
     public function deliveryUpdate(Request $request)
     {
 
-        $delivStatus = $request->input('delivStatus');
         $orderId = $request->input('orderId');
         $userId = $request->input('userId');
-        $mealPeriod = $request->input('mealType');
         $menuId = $request->input('menuId');
+        $delivStatus = $request->input('delivStatus');
+
+
+        // $mealPeriod = $request->input('mealType');
+
 
 
 
@@ -119,10 +145,6 @@ class DeliveryController extends Controller
             ->value('mrd_order_total_price');
 
 
-        $orderQuantity = DB::table('mrd_order')
-            ->where('mrd_order_id', $orderId)
-            ->value('mrd_order_quantity');
-
         $menuPeriod = DB::table('mrd_menu')
             ->where('mrd_menu_id', $menuId)
             ->value('mrd_menu_period');
@@ -134,28 +156,39 @@ class DeliveryController extends Controller
 
         if ($delivStatus == 'delivered') {
             $notif_message =  "Your " . $menuPeriod . " has been delivered.";
-            //$notif_credit_calc = $userCredit . ' - ' . $orderTotalPrice . ' = ' . $userCreditNew;
             $notif_credit_calc = null;
 
-            //userCredit = 100
-            //orderTotalPrice = 100
 
-            //userCreditNew = 0
-            //cashToCollect = 0
+            //NOTIFICATION INSERT ON DELIVERY STATUS
+            $notifInsert = DB::table('mrd_notification')->insert([
+                'mrd_notif_user_id' =>
+                $userId,
+                'mrd_notif_message' => $notif_message,
 
+                'mrd_notif_total_price' => $notif_credit_calc,
+                'mrd_notif_type' => 'delivery'
+            ]);
+
+
+            //COMPARE USER CREDIT WITH PRICE
             if ($userCredit >= $orderTotalPrice) {
                 $userCreditNew = $userCredit - $orderTotalPrice;
-                $cashToCollect = 0;
-            }
+                //NOTIF INSERT
+                $notifInsert = DB::table('mrd_notification')->insert([
+                    'mrd_notif_user_id' =>
+                    $userId,
+                    'mrd_notif_message' => '৳' . $orderTotalPrice . ' has been paid from your wallet. New credit: ৳'
+                        . $userCreditNew,
 
-            //userCredit = 100
-            //orderTotalPrice = 150
+                    'mrd_notif_total_price' => $notif_credit_calc,
+                    'mrd_notif_type' => 'order'
+                ]);
 
-            //userCreditNew = 50
-            //cashToCollect = 0
-            else {
+                $paymentMethod = 'wallet';
+            } else {
                 $userCreditNew = 0;
-                $cashToCollect = $orderTotalPrice - $userCredit;
+                $paymentMethod = 'cod';
+                // $cashToCollect = $orderTotalPrice - $userCredit;
             }
 
             // Update the customer's wallet balance
@@ -164,20 +197,29 @@ class DeliveryController extends Controller
                 ->update(['mrd_user_credit' => $userCreditNew]);
 
 
-            //NOTIFICATION INSERT
-            $notifInsert = DB::table('mrd_notification')->insert([
-                'mrd_notif_user_id' =>
-                $userId,
-                'mrd_notif_message' => $notif_message,
 
-                'mrd_notif_total_price' => $notif_credit_calc,
-                'mrd_notif_type' => 'order'
-            ]);
 
-            //ORDER DELIVE STATUS UPDATE
+
+            //ORDER DELIV STATUS UPDATE
             $delivUpdate = DB::table('mrd_order')
                 ->where('mrd_order_id', $orderId)
-                ->update(['mrd_order_status' => $delivStatus]);
+                ->update([
+                    'mrd_order_status' => $delivStatus,
+                    'mrd_order_user_pay_status' => 'paid'
+                ]);
+
+            //PAYMENT INSERT
+            $paymentInsert = DB::table('mrd_payment')->insert([
+                'mrd_payment_status' =>
+                'paid',
+                'mrd_payment_amount' =>
+                $orderTotalPrice,
+                'mrd_payment_user_id' => $userId,
+
+                'mrd_payment_order_id' => $orderId,
+                'mrd_payment_for' => 'order',
+                'mrd_payment_method' => $paymentMethod
+            ]);
 
 
 
@@ -188,7 +230,7 @@ class DeliveryController extends Controller
                 ->select('mrd_order_id', 'mrd_order_total_price')
                 ->first();
 
-
+            //UPDATE CASH TO GET IF USER HAS A NEXT ORDER
             if (
                 $nextOrder
             ) {
@@ -196,28 +238,9 @@ class DeliveryController extends Controller
                 $nextOrderId = $nextOrder->mrd_order_id;
                 $nextOrderTotalPrice = $nextOrder->mrd_order_total_price;
 
-
-
                 $userCreditUpdated = DB::table('mrd_user')
                     ->where('mrd_user_id', $userId)
                     ->value('mrd_user_credit');
-
-
-                // 200 INITITAL CREDIT 
-
-                // 2024-08-01  CALCULATED
-                // 150 
-                // coc = 0 
-
-                // 2024-08-02
-                // 50 - 100 = -50  (subtotal credit)
-                // coc = 50
-
-                // 2024-08-05
-                // -50 - 150 = -200  (subtotal credit)
-                // coc = 0
-
-
 
                 $userCreditUpdated = DB::table('mrd_user')
                     ->where('mrd_user_id', $userId)
@@ -345,7 +368,7 @@ class DeliveryController extends Controller
             'delivStatus' => $delivStatus,
             'orderId' => $orderId,
             'userId' => $userId,
-            'mealPeriod' => $mealPeriod,
+
             'menuId' => $menuId,
         ]);
     }

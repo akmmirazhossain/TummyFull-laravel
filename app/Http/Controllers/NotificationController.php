@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\MenuController;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
-use \App\Models\OrderMod;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Exception;
+
+
 
 
 class NotificationController extends Controller
@@ -19,6 +17,7 @@ class NotificationController extends Controller
         $menuId = $request->input('menuId');
         $date = $request->input('date');
         $price = $request->input('price');
+        $orderId = $request->input('orderId');
         $TFLoginToken = $request->input('TFLoginToken');
         $switchValue = $request->input('switchValue');
         $quantity = $request->input('quantity');
@@ -54,12 +53,6 @@ class NotificationController extends Controller
             $notif_message =  "Canceled " . $menuPeriod . " of " . $formattedDate;
         }
 
-        $orderId = DB::table('mrd_order')
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_user_id', $userId)
-            ->where('mrd_order_date', $date)
-            ->pluck('mrd_order_id')
-            ->first();
 
 
 
@@ -73,14 +66,14 @@ class NotificationController extends Controller
             'mrd_notif_quantity' => $quantity,
         ]);
 
-        $creditSum = $userCredit + $price;
+        // $creditSum = $userCredit + $price;
 
-        if ($creditSum < 0) {
+        // if ($creditSum < 0) {
 
-            echo "The sum is negative.";
+        //     echo "The sum is negative.";
 
-            $notif_message =  "Ordered " . $menuPeriod . " of " . $formattedDate;
-        }
+        //     $notif_message =  "Ordered " . $menuPeriod . " of " . $formattedDate;
+        // }
 
 
 
@@ -88,7 +81,7 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Notification added',
-            'orderId' => $orderId
+            // 'orderId' => $orderId
         ]);
     }
 
@@ -118,7 +111,7 @@ class NotificationController extends Controller
         ]);
     }
 
-    //MARK: GET NOTIFICATIONS
+    //MARK: GET NOTIF
     public function notifGet(Request $request)
     {
         $TFLoginToken =
@@ -127,7 +120,7 @@ class NotificationController extends Controller
             ->where('mrd_user_session_token', $TFLoginToken)
             ->value('mrd_user_id');
 
-        $notifications = DB::select("SELECT mrd_notif_message,mrd_notif_date_added,mrd_notif_quantity,mrd_notif_total_price,mrd_notif_type FROM mrd_notification WHERE mrd_notif_user_id = $userId ORDER BY mrd_notif_date_added DESC LIMIT 100");
+        $notifications = DB::select("SELECT mrd_notif_message,mrd_notif_date_added,mrd_notif_quantity,mrd_notif_total_price,mrd_notif_seen,mrd_notif_type FROM mrd_notification WHERE mrd_notif_user_id = $userId ORDER BY mrd_notif_id DESC LIMIT 100");
 
         return response()->json([
 
@@ -135,13 +128,30 @@ class NotificationController extends Controller
         ]);
     }
 
-    //MARK: Mbox stat
-    public function getUserMealboxById($id)
+
+    //MARK: NOTIF SEEN
+    public function notifSeen(Request $request)
     {
+        $TFLoginToken =
+            $request->header('Authorization');
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
+
+        $notif_seen = DB::table('mrd_notification')
+            ->where('mrd_notif_user_id', $userId)
+            ->where('mrd_notif_seen', 0) // Only update rows where mrd_notif_seen is 0
+            ->update(['mrd_notif_seen' => 1]);
+
+        return response()->json([
+
+            'notif_seen' =>   'true'
+        ]);
     }
 
+    //MARK: Mbox stat
+    public function getUserMealboxById($id) {}
+
     //MARK: Mbox Stat API
-    public function mealboxStatApi(Request $request)
-    {
-    }
+    public function mealboxStatApi(Request $request) {}
 }
