@@ -34,6 +34,7 @@ class DeliveryController extends Controller
                     ->where('delivery_user.mrd_user_type', '=', 'delivery')
                     ->where('delivery_user.mrd_user_id', '=', $userId);
             })
+            ->join('mrd_setting', 'mrd_setting.mrd_setting_id', '=', DB::raw('1'))
             ->select(
                 'mrd_menu.mrd_menu_period',
                 'mrd_menu.mrd_menu_id',
@@ -52,6 +53,7 @@ class DeliveryController extends Controller
                 'mrd_user.mrd_user_chef_id',
                 'mrd_user.mrd_user_has_mealbox',
                 'mrd_user.mrd_user_mealbox_paid',
+                'mrd_setting.mrd_setting_mealbox_price',
                 'mrd_user.mrd_user_delivery_instruction',
                 'mrd_area.mrd_area_name',
                 'delivery_user.mrd_user_id as delivery_user_id'
@@ -128,7 +130,10 @@ class DeliveryController extends Controller
         $orderId = $request->input('orderId');
         $userId = $request->input('userId');
         $menuId = $request->input('menuId');
+        // $giveMealbox = $request->input('giveMealbox');
+        $mealboxPaid = $request->input('mealboxPaid');
         $delivStatus = $request->input('delivStatus');
+        $mboxPick = $request->input('mboxPick');
 
 
         // $mealPeriod = $request->input('mealType');
@@ -177,8 +182,7 @@ class DeliveryController extends Controller
                 $notifInsert = DB::table('mrd_notification')->insert([
                     'mrd_notif_user_id' =>
                     $userId,
-                    'mrd_notif_message' => '৳' . $orderTotalPrice . ' has been paid from your wallet. New credit: ৳'
-                        . $userCreditNew,
+                    'mrd_notif_message' => '৳' . $orderTotalPrice . ' has been paid from your wallet. New credit: ' . $userCredit . ' - ' . $orderTotalPrice . ' = ৳' . $userCreditNew,
 
                     'mrd_notif_total_price' => $notif_credit_calc,
                     'mrd_notif_type' => 'order'
@@ -188,27 +192,31 @@ class DeliveryController extends Controller
             } else {
                 $userCreditNew = 0;
                 $paymentMethod = 'cod';
-                // $cashToCollect = $orderTotalPrice - $userCredit;
+                $cashToCollect = $orderTotalPrice - $userCredit;
+
+                if (($userCredit != 0) && ($userCredit <= $orderTotalPrice)) {
+                    $notif_message =  '৳' . $userCredit . ' has been paid from wallet & ৳' . $cashToCollect . ' via cash on delivery.';
+                } else {
+
+                    $notif_message =  '৳' . $orderTotalPrice . ' has been paid via cash on delivery.';
+                }
+
+                $notifInsert = DB::table('mrd_notification')->insert([
+                    'mrd_notif_user_id' =>
+                    $userId,
+                    'mrd_notif_message' => $notif_message,
+
+                    'mrd_notif_total_price' => $notif_credit_calc,
+                    'mrd_notif_type' => 'order'
+                ]);
             }
 
-            // Update the customer's wallet balance
+            //UPDATE WALLET AFTER ORDER PRICE CUT
             $userCreditUpdate = DB::table('mrd_user')
                 ->where('mrd_user_id', $userId)
                 ->update(['mrd_user_credit' => $userCreditNew]);
 
-
-
-
-
-            //ORDER DELIV STATUS UPDATE
-            $delivUpdate = DB::table('mrd_order')
-                ->where('mrd_order_id', $orderId)
-                ->update([
-                    'mrd_order_status' => $delivStatus,
-                    'mrd_order_user_pay_status' => 'paid'
-                ]);
-
-            //PAYMENT INSERT
+            //PAYMENT INSERT FOR ORDER
             $paymentInsert = DB::table('mrd_payment')->insert([
                 'mrd_payment_status' =>
                 'paid',
@@ -220,6 +228,75 @@ class DeliveryController extends Controller
                 'mrd_payment_for' => 'order',
                 'mrd_payment_method' => $paymentMethod
             ]);
+
+
+            //ORDER DELIV STATUS UPDATE
+            $delivUpdate = DB::table('mrd_order')
+                ->where('mrd_order_id', $orderId)
+                ->update([
+                    'mrd_order_status' => $delivStatus,
+                    'mrd_order_user_pay_status' => 'paid'
+                ]);
+
+
+
+            //MEALBOX: Logics
+            //Increment the number of mealboxes the customer has
+            $user = DB::table('mrd_user')->where('mrd_user_id', $userId)->first();
+
+            if ($user->mrd_user_mealbox == 1 && $user->mrd_user_has_mealbox < 2) {
+
+                DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->increment('mrd_user_has_mealbox');
+            } else {
+                // Optional: Handle cases where they already have 2 mealboxes or mealbox system is not activated
+            }
+
+
+            // $mealboxesReturned = 2; // Number of mealboxes returned (can be 1 or 2)
+            if ($user->mrd_user_has_mealbox >= $mboxPick) {
+                // Decrease the number of mealboxes based on how many are returned
+                DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->decrement('mrd_user_has_mealbox', $mboxPick);
+            }
+
+            //IF Mealbox actitvated, and HAS mealbox < 3, then give mealbox
+            //IF THE DELVIERY PERSON PICKED THE MEALBOX or NOT, update it
+            // $hasMealboxUpdate = DB::table('mrd_user')
+            //     ->where('mrd_user_id', $userId)
+            //     ->update([
+            //         'mrd_user_has_mealbox' => $giveMealbox
+            //     ]);
+
+
+            //IF THE USER HAS PAID FOT THE MEALBOX UPDATE/INSERT 
+            if ($user->mrd_user_mealbox == 1 && $user->mrd_user_mealbox_paid == 0) {
+
+                //GET MEALBOX PRICE
+                $mealboxPrice = DB::table('mrd_setting')
+                    ->value('mrd_setting_mealbox_price');
+                //MARK MEALBOX PAID IF IT IS UNPAID = 0
+                $hasMealboxUpdate = DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->update([
+                        'mrd_user_mealbox_paid' => '1'
+                    ]);
+
+
+
+                //PAYMENT INSERT FOR MEALBOX
+                $paymentInsert = DB::table('mrd_payment')->insert([
+                    'mrd_payment_status' =>
+                    'paid',
+                    'mrd_payment_amount' =>
+                    $mealboxPrice,
+                    'mrd_payment_user_id' => $userId,
+                    'mrd_payment_for' => 'mealbox',
+                    'mrd_payment_method' => 'cod'
+                ]);
+            }
 
 
 

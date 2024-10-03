@@ -79,7 +79,7 @@ Route::get('/chef-payment-history', [ChefController::class, 'chefPaymentHistory'
 
 use App\Http\Controllers\DeliveryController;
 
-Route::post('/delivery-list', [DeliveryController::class, 'deliveryList']);
+Route::get('/delivery-list', [DeliveryController::class, 'deliveryList']);
 Route::post('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
 
 

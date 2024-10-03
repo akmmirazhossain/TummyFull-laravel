@@ -22,8 +22,9 @@
                 <ul class="steps steps-vertical lg:steps-horizontal w-full">
                     <li class="step step-primary">After Receiving Money in Bkash/Nagad</li>
                     <li class="step step-primary">Search Phone Number here</li>
+                    <li class="step step-primary">Click Recharge Wallet</li>
                     <li class="step step-primary">Enter Amount</li>
-                    <li class="step step-primary">Click Recharge</li>
+                    <li class="step step-primary">Click Confirm Recharge</li>
                 </ul>
             </div>
         </div>
@@ -34,7 +35,22 @@
                 <div>
                     <input type="text" id="user_phone" placeholder="017 _ _ _ _ _ _ _ _ _"
                         class="input input-bordered input-lg w-full max-w-xs" />
-                    <div id="user_results" class="mt-2"></div> <!-- Placeholder for results -->
+
+
+                    <table class="table table-zebra mt_akm">
+                        <thead>
+                            <tr class="hover">
+                                <th>User ID</th>
+                                <th>Name</th>
+                                <th>Credit</th>
+                                <th>Phone</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="user_results">
+
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -43,13 +59,15 @@
     <!-- DaisyUI Modal -->
     <div id="rechargeModal" class="modal">
         <div class="modal-box">
-            <h3 class="font-bold text-lg">Recharge Wallet</h3>
-            <p>ID: <span id="modal_user_id"></span></p>
+            <h3 class="h3_akm">Recharge Wallet</h3>
+            <div class="divider"></div>
             <p>Name: <span id="modal_user_name"></span></p>
+            <p>User ID: <span id="modal_user_id"></span></p>
+
             <p>Current Credit: <span id="modal_user_credit"></span></p>
             <p>Phone: <span id="modal_user_phone"></span></p>
 
-            <!-- New: Input field for BDT amount -->
+            <div class="divider"></div>
             <div>
                 <label for="recharge_amount" class="block">Enter BDT Amount:</label>
                 <input type="number" id="recharge_amount" class="input input-bordered w-full" required min="1"
@@ -58,7 +76,7 @@
 
             <!-- New: Submit button to trigger AJAX call -->
             <div class="modal-action">
-                <button id="submitRecharge" class="btn btn-success">Recharge</button>
+                <button id="submitRecharge" class="btn btn-success">Confirm Recharge</button>
                 <button class="btn btn-error" onclick="closeModal()">Close</button>
             </div>
         </div>
@@ -88,13 +106,16 @@
                             // Iterate through the response data
                             response.data.forEach(function(user) {
                                 $('#user_results').append(`
-                                    <div class="user-item border-b">
-                                        <p>ID: ${user.mrd_user_id}</p>
-                                        <p>Name: ${user.mrd_user_first_name}</p>
-                                        <p>Current Credit: ${user.mrd_user_credit}</p>
-                                        <p>Phone: ${user.mrd_user_phone}</p>
-                                        <button class="btn btn-info" data-id="${user.mrd_user_id}" data-name="${user.mrd_user_first_name}" data-credit="${user.mrd_user_credit}" data-phone="${user.mrd_user_phone}">Recharge Wallet</button>
-                                    </div>`);
+                <tr class="hover">
+                    <td>${user.mrd_user_id}</td>
+                    <td>${user.mrd_user_first_name}</td>
+                    <td>${user.mrd_user_credit}</td>
+                    <td>${user.mrd_user_phone}</td>
+                    <td>
+                        <button class="btn btn-info" data-id="${user.mrd_user_id}" data-name="${user.mrd_user_first_name}" data-credit="${user.mrd_user_credit}" data-phone="${user.mrd_user_phone}">Recharge Wallet</button>
+                    </td>
+                </tr>
+            `);
                             });
                         } else {
                             $('#user_results').append('<p>No data found</p>');

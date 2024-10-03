@@ -98,11 +98,84 @@ class SettingController extends Controller
         // Get the current date
         $today = Carbon::today()->toDateString();
 
-        // UPDATE ORDER MEALBOX STATUS
+        $lunchLimit = DB::table('mrd_setting')->value('mrd_setting_time_limit_lunch');
+        $lunchLimitDateTime = now()->format('Y-m-d') . ' ' . $lunchLimit . ':00';
+
+
+        $dinnerLimit = DB::table('mrd_setting')->value('mrd_setting_time_limit_dinner');
+        $dinnerLimitDateTime = now()->format('Y-m-d') . ' ' . $dinnerLimit . ':00';
+
+
+        $currentDateTime = now()->format('Y-m-d H:i:s');
+        $currentDate = now()->format('Y-m-d');
+
+        if ($currentDateTime < $lunchLimitDateTime) {
+
+            DB::table('mrd_order')
+                ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+                ->whereDate('mrd_order.mrd_order_date', $currentDate)
+                ->where('mrd_menu.mrd_menu_period', 'lunch')
+                ->where('mrd_order.mrd_order_user_id', $userId)
+                ->update([
+                    'mrd_order.mrd_order_mealbox' => $switchValue
+                ]);
+        }
+
+
+        if ($currentDateTime < $dinnerLimitDateTime) {
+
+            DB::table('mrd_order')
+                ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+                ->whereDate('mrd_order.mrd_order_date', $currentDate)
+                ->where('mrd_menu.mrd_menu_period', 'dinner')
+                ->where('mrd_order.mrd_order_user_id', $userId)
+                ->update([
+                    'mrd_order.mrd_order_mealbox' => $switchValue
+                ]);
+        }
+
         $update = DB::table('mrd_order')
             ->where('mrd_order_user_id', $userId)
             ->whereDate('mrd_order_date', '>', $today)
             ->update(['mrd_order_mealbox' => $switchValue]);
+
+
+        // if ($currentDateTime < $dinnerLimitDateTime) {
+
+        //     DB::table('mrd_order')
+        //         ->where('mrd_order_date_insert', '>', $currentDateTime)
+        //         ->where('mrd_order_user_id', $userId)
+        //         ->update([
+        //             'mrd_order_mealbox' => $switchValue,
+        //         ]);
+        // }
+
+        //IF MEALBOX ACTIVATED THEN
+        //LOGIC 1: IF LUNCH ordered(CURRENT TIME) BEFORE LUNCH LIMIT -> give mealbox for LUNCH 
+        //(UPDATE user  SET mrd_user_mealbox = 1, mrd_user_has_mealbox = 0, mrd_user_mealbox_paid = 0)
+
+
+        //LOGIC 1: IF LUNCH ordered(CURRENT TIME) BEFORE LUNCH LIMIT -> give mealbox for LUNCH 
+        //(UPDATE user  SET mrd_user_mealbox = 1, mrd_user_has_mealbox = 0, mrd_user_mealbox_paid = 0)
+
+        //LOGIC 2: IF LUNCH ordered(CURRENT TIME) AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
+        //LOGIC 3: IF DINNER ordered(CURRENT TIME) BEFORE DINNER LIMIT -> give mealbox for DINNER
+        //LOGIC 4: IF DINNER ordered(CURRENT TIME) AFTER DINNER LIMIT -> GIVE MEALBOX for next order
+
+        //IF MEALBOX DEACTIVATED
+        //LOGIC 1: IF LUNCH order AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
+        //LOGIC 2: IF LUNCH order AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
+
+
+
+
+
+
+        // UPDATE ORDER MEALBOX STATUS
+        // $update = DB::table('mrd_order')
+        //     ->where('mrd_order_user_id', $userId)
+        //     // ->whereDate('mrd_order_date', '>', $today)
+        //     ->update(['mrd_order_mealbox' => $switchValue]);
 
         // // Check if a row exists
         // $exists = DB::table('mrd_delivery')
@@ -135,6 +208,9 @@ class SettingController extends Controller
         return response()->json([
             "success" => true,
             "switchValue" => $switchValue,
+            "currentDateTime" => $currentDateTime,
+            "lunchLimitDateTime" => $lunchLimitDateTime,
+            "dinnerLimitDateTime" => $dinnerLimitDateTime,
 
 
         ]);

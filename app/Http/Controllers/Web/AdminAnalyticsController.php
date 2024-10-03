@@ -299,27 +299,28 @@ class AdminAnalyticsController extends Controller
 
 
 
-    // public function order_list()
-    // {
-    //     $sql = "
-    //     SELECT 
-    //         mrd_order.mrd_order_quantity,
-    //         mrd_order.mrd_order_total_price,
-    //         mrd_order.mrd_order_cash_to_get,
-    //         mrd_order.mrd_order_status,
-    //         mrd_order.mrd_order_user_pay_status,
-    //         mrd_order.mrd_order_mealbox,
-    //         mrd_order.mrd_order_date_insert,
-    //         mrd_order.mrd_order_date,
-    //         mrd_user.mrd_user_first_name as user_name
-    //     FROM 
-    //         mrd_order
-    //     JOIN 
-    //         mrd_user ON mrd_order.mrd_order_user_id = mrd_user.mrd_user_id
-    // ";
+    public function order_list()
+    {
+        $sql = "
+        SELECT 
+            mrd_order.mrd_order_quantity,
+            mrd_order.mrd_order_total_price,
+            mrd_order.mrd_order_cash_to_get,
+            mrd_order.mrd_order_status,
+            mrd_order.mrd_order_user_pay_status,
+            mrd_order.mrd_order_mealbox,
+            mrd_order.mrd_order_date_insert,
+            mrd_order.mrd_order_date,
+            mrd_user.mrd_user_first_name as user_name
+        FROM 
+            mrd_order
+        JOIN 
+            mrd_user ON mrd_order.mrd_order_user_id = mrd_user.mrd_user_id
+            ORDER BY mrd_order.mrd_order_date DESC
+    ";
 
-    //     $orders = DB::select($sql);
+        $orders = DB::select($sql);
 
-    //     return view('order_list', compact('orders'));
-    // }
+        return view('order_list', compact('orders'));
+    }
 }
