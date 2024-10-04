@@ -53,6 +53,7 @@ class DeliveryController extends Controller
                 'mrd_user.mrd_user_chef_id',
                 'mrd_user.mrd_user_has_mealbox',
                 'mrd_user.mrd_user_mealbox_paid',
+                'mrd_user.mrd_user_credit',
                 'mrd_setting.mrd_setting_mealbox_price',
                 'mrd_user.mrd_user_delivery_instruction',
                 'mrd_area.mrd_area_name',
@@ -195,7 +196,7 @@ class DeliveryController extends Controller
                 $cashToCollect = $orderTotalPrice - $userCredit;
 
                 if (($userCredit != 0) && ($userCredit <= $orderTotalPrice)) {
-                    $notif_message =  '৳' . $userCredit . ' has been paid from wallet & ৳' . $cashToCollect . ' via cash on delivery.';
+                    $notif_message =  '৳' . $userCredit . ' has been paid from wallet & ৳' . $cashToCollect . ' via cash on delivery. New credit: ৳' . $userCreditNew;
                 } else {
 
                     $notif_message =  '৳' . $orderTotalPrice . ' has been paid via cash on delivery.';

@@ -66,16 +66,6 @@ class NotificationController extends Controller
             'mrd_notif_quantity' => $quantity,
         ]);
 
-        // $creditSum = $userCredit + $price;
-
-        // if ($creditSum < 0) {
-
-        //     echo "The sum is negative.";
-
-        //     $notif_message =  "Ordered " . $menuPeriod . " of " . $formattedDate;
-        // }
-
-
 
 
         return response()->json([
@@ -94,12 +84,27 @@ class NotificationController extends Controller
         $mealBoxPrice = DB::table('mrd_setting')
             ->value('mrd_setting_mealbox_price');
 
+        $mealboxIfPaid = DB::table('mrd_user')
+            ->where('mrd_user_id', $userId)
+            ->value('mrd_user_mealbox_paid');
+
         if (
             $switchValue == 1
         ) {
             $notif_message =  "Activated mealbox for TK " . $mealBoxPrice . ".";
+
+            if ($mealboxIfPaid == 1) {
+                $notif_message =  "Mealbox reactivated.";
+            } else {
+                $notif_message =  "Mealbox activated. Tk " . $mealBoxPrice . " will be refunded, and your current mealbox will be collected.";
+            }
         } else {
-            $notif_message =  "Deactivated mealbox, Tk " . $mealBoxPrice . " will be refunded.";
+
+            if ($mealboxIfPaid == 1) {
+                $notif_message =  "Mealbox deactivated. Tk " . $mealBoxPrice . " will be refunded, and your current mealbox will be collected.";
+            } else {
+                $notif_message =  "Mealbox deactivated";
+            }
         }
 
 

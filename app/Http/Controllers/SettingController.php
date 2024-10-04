@@ -74,9 +74,7 @@ class SettingController extends Controller
         return response()->json($output);
     }
 
-    //MARK: MEALBOX STATUS UPDATER
-    // Updates USER_mealbox 0,1 
-    // Updates ORDER_mealbox 0,1 after today
+
     public function mealboxSwitch(Request $request)
     {
         $switchValue = $request->input("switchValue");
@@ -166,41 +164,6 @@ class SettingController extends Controller
         //LOGIC 1: IF LUNCH order AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
         //LOGIC 2: IF LUNCH order AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
 
-
-
-
-
-
-        // UPDATE ORDER MEALBOX STATUS
-        // $update = DB::table('mrd_order')
-        //     ->where('mrd_order_user_id', $userId)
-        //     // ->whereDate('mrd_order_date', '>', $today)
-        //     ->update(['mrd_order_mealbox' => $switchValue]);
-
-        // // Check if a row exists
-        // $exists = DB::table('mrd_delivery')
-        //     ->where('mrd_delivery_user_id', $userId)
-        //     ->where('mrd_delivery_message_type', 'mealbox')
-        //     ->exists();
-
-        // if ($exists) {
-        //     // Update existing row
-        //     DB::table('mrd_delivery')
-        //         ->where('mrd_delivery_user_id', $userId)
-        //         ->where('mrd_delivery_message_type', 'mealbox')
-        //         ->update([
-        //             'mrd_delivery_status' => $switchValue == 1 ? '1' : '0',
-        //             'mrd_delivery_message' => $switchValue == 1 ? 'mealbox activated' : 'mealbox deactivated'
-        //         ]);
-        // } else {
-        //     // Insert new row
-        //     DB::table('mrd_delivery')->insert([
-        //         'mrd_delivery_user_id' => $userId,
-        //         'mrd_delivery_message_type' => 'mealbox',
-        //         'mrd_delivery_status' => $switchValue == 1 ? '1' : '0',
-        //         'mrd_delivery_message' => $switchValue == 1 ? 'mealbox activated' : 'mealbox deactivated'
-        //     ]);
-        // }
 
 
 

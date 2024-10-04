@@ -7,8 +7,8 @@
         {{-- @vite(['resources/css/app.css', 'resources/js/app.js']) --}}
 
 
-        {{-- <link rel="stylesheet" href="{{ asset('build/assets/app-4e5e7dd6.css') }}"> --}}
-        @vite('resources/css/app.css')
+        <link rel="stylesheet" href="{{ asset('build/assets/app-b603f8f5.css') }}">
+        {{-- @vite('resources/css/app.css') --}}
         @vite('resources/js/app.js')
 
     </head>
