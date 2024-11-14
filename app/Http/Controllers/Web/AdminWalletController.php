@@ -104,21 +104,17 @@ class AdminWalletController extends Controller
                     ->value('mrd_user_credit');
 
 
-                // $userCreditUpdated = DB::table('mrd_user')
-                //     ->where(
-                //         'mrd_user_id',
-                //         $userId
-                //     )
-                //     ->value('mrd_user_credit');
+                $delivComm = DB::table('mrd_order')
+                    ->value('mrd_order_deliv_commission');
 
                 if (
-                    $userCreditUpdated >= $nextOrderTotalPrice
+                    $userCreditUpdated >= ($nextOrderTotalPrice + $delivComm)
                 ) {
                     //$userCreditUpdatedNew = $userCreditUpdated - $nextOrderTotalPrice;
                     $cash_to_get = 0;
                 } else {
                     // $userCreditUpdatedNew = 0;
-                    $cash_to_get = $nextOrderTotalPrice - $userCreditUpdated;
+                    $cash_to_get = ($nextOrderTotalPrice + $delivComm) - $userCreditUpdated;
                 }
 
                 //CASH TO GET UPDATE

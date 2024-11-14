@@ -49,9 +49,9 @@ class SettingController extends Controller
         $output = [
             "announcement" => $mrdSetting->mrd_setting_announcement,
             // "mrd_setting_meal_price" => $mrdSetting->mrd_setting_meal_price,
-            // "mrd_setting_mealbox_price" => $mrdSetting->mrd_setting_mealbox_price,
+            "mealbox_price" => $mrdSetting->mrd_setting_mealbox_price,
             // "mrd_setting_commission_chef" => $mrdSetting->mrd_setting_commission_chef,
-            // "mrd_setting_commission_delivery" => $mrdSetting->mrd_setting_commission_delivery,
+            "mrd_setting_commission_delivery" => $mrdSetting->mrd_setting_commission_delivery,
             // "mrd_setting_commission_supplier" => $mrdSetting->mrd_setting_commission_supplier,
             // "order_max_days" => $mrdSetting->mrd_setting_order_max_days,
             "time_limit_lunch" => $timeLimitLunch,
@@ -62,7 +62,7 @@ class SettingController extends Controller
             $mrdSetting->mrd_setting_delivery_time_lunch,
             "delivery_time_dinner" =>
             $mrdSetting->mrd_setting_delivery_time_dinner,
-            // "delivery_charge" => $mrdSetting->mrd_setting_delivery_charge,
+
             // "quantity_min" => $mrdSetting->mrd_setting_quantity_min,
             // "quantity_max" => $mrdSetting->mrd_setting_quantity_max,
             "server_time" => $serverTime,
@@ -74,7 +74,7 @@ class SettingController extends Controller
         return response()->json($output);
     }
 
-
+    //MARK: Mealbox Switch
     public function mealboxSwitch(Request $request)
     {
         $switchValue = $request->input("switchValue");
@@ -136,34 +136,6 @@ class SettingController extends Controller
             ->where('mrd_order_user_id', $userId)
             ->whereDate('mrd_order_date', '>', $today)
             ->update(['mrd_order_mealbox' => $switchValue]);
-
-
-        // if ($currentDateTime < $dinnerLimitDateTime) {
-
-        //     DB::table('mrd_order')
-        //         ->where('mrd_order_date_insert', '>', $currentDateTime)
-        //         ->where('mrd_order_user_id', $userId)
-        //         ->update([
-        //             'mrd_order_mealbox' => $switchValue,
-        //         ]);
-        // }
-
-        //IF MEALBOX ACTIVATED THEN
-        //LOGIC 1: IF LUNCH ordered(CURRENT TIME) BEFORE LUNCH LIMIT -> give mealbox for LUNCH 
-        //(UPDATE user  SET mrd_user_mealbox = 1, mrd_user_has_mealbox = 0, mrd_user_mealbox_paid = 0)
-
-
-        //LOGIC 1: IF LUNCH ordered(CURRENT TIME) BEFORE LUNCH LIMIT -> give mealbox for LUNCH 
-        //(UPDATE user  SET mrd_user_mealbox = 1, mrd_user_has_mealbox = 0, mrd_user_mealbox_paid = 0)
-
-        //LOGIC 2: IF LUNCH ordered(CURRENT TIME) AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
-        //LOGIC 3: IF DINNER ordered(CURRENT TIME) BEFORE DINNER LIMIT -> give mealbox for DINNER
-        //LOGIC 4: IF DINNER ordered(CURRENT TIME) AFTER DINNER LIMIT -> GIVE MEALBOX for next order
-
-        //IF MEALBOX DEACTIVATED
-        //LOGIC 1: IF LUNCH order AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
-        //LOGIC 2: IF LUNCH order AFTER LUNCH LIMIT -> GIVE MEALBOX for next order
-
 
 
 

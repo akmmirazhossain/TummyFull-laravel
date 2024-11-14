@@ -20,7 +20,8 @@ class PhoneVerificationController extends Controller
 
         $otp = rand(1000, 9999);
         $hashedOtp = Hash::make($otp);
-        $message = 'Your OTP is ' . $otp . ' ' . date('h:i a d-M-Y', time()) . '. Do not share this OTP with anyone.';
+        // $message = 'Your OTP is ' . $otp . ' ' . date('h:i a d-M-Y', time()) . '.';
+        $message = 'Your OTP is ' . $otp;
 
 
         $url = "http://api.greenweb.com.bd/api.php?json";

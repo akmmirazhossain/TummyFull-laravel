@@ -56,4 +56,10 @@ class AuthController extends Controller
         $request->session()->flush();
         return redirect('/login');
     }
+
+    public function hashpass(Request $request)
+    {
+        $hashedPassword = Hash::make('1234');
+        echo $hashedPassword;
+    }
 }

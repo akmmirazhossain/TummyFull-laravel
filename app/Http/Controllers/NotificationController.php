@@ -29,13 +29,17 @@ class NotificationController extends Controller
             ->value('mrd_user_id');
 
 
-        $userCredit = DB::table('mrd_user')
-            ->where('mrd_user_session_token', $TFLoginToken)
-            ->value('mrd_user_credit');
+        // $userCredit = DB::table('mrd_user')
+        //     ->where('mrd_user_session_token', $TFLoginToken)
+        //     ->value('mrd_user_credit');
 
-        $menuPrice = DB::table('mrd_menu')
-            ->where('mrd_menu_id', $menuId)
-            ->value('mrd_menu_price');
+        // $menuPrice = DB::table('mrd_menu')
+        //     ->where('mrd_menu_id', $menuId)
+        //     ->value('mrd_menu_price');
+
+        $comissionDeliv =
+            DB::table('mrd_order')
+            ->value('mrd_order_deliv_commission');
 
         $menuPeriod = DB::table('mrd_menu')
             ->where('mrd_menu_id', $menuId)
@@ -56,16 +60,21 @@ class NotificationController extends Controller
 
 
 
-        $notifInsert = DB::table('mrd_notification')->insert([
-            'mrd_notif_user_id' =>
-            $userId,
+        $optionalFields = [];
+
+        if ($switchValue == 1) {
+            $optionalFields = [
+                'mrd_notif_total_price' => $price + $comissionDeliv,
+                'mrd_notif_quantity' => $quantity,
+            ];
+        }
+
+        $notifInsert = DB::table('mrd_notification')->insert(array_merge([
+            'mrd_notif_user_id' => $userId,
             'mrd_notif_message' => $notif_message,
             'mrd_notif_order_id' => $orderId,
-            'mrd_notif_total_price' => $price,
             'mrd_notif_type' => 'order',
-            'mrd_notif_quantity' => $quantity,
-        ]);
-
+        ], $optionalFields));
 
 
         return response()->json([
@@ -91,19 +100,19 @@ class NotificationController extends Controller
         if (
             $switchValue == 1
         ) {
-            $notif_message =  "Activated mealbox for TK " . $mealBoxPrice . ".";
+            // $notif_message =  "Activated mealbox for TK " . $mealBoxPrice . ".";
 
             if ($mealboxIfPaid == 1) {
                 $notif_message =  "Mealbox reactivated.";
             } else {
-                $notif_message =  "Mealbox activated. Tk " . $mealBoxPrice . " will be refunded, and your current mealbox will be collected.";
+                $notif_message =  "Mealbox activated for Tk " . $mealBoxPrice . ". Your upcoming meals will be delivered in a mealbox.";
             }
         } else {
 
             if ($mealboxIfPaid == 1) {
                 $notif_message =  "Mealbox deactivated. Tk " . $mealBoxPrice . " will be refunded, and your current mealbox will be collected.";
             } else {
-                $notif_message =  "Mealbox deactivated";
+                $notif_message =  "Mealbox deactivated.";
             }
         }
 

@@ -12,21 +12,14 @@
 | be assigned to the "api" middleware group. Make something great!
 |
  */
+//AUTH ROUTES
+use App\Http\Controllers\Web\AuthController;
 
-// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-//     return $request->user();
-// });
-
-// use App\Http\Controllers\Basic;
-
-// Route::get('basic', 'Basic@index');
-
-// routes/api.php
+Route::get('/hashpass', [AuthController::class, 'hashpass']);
 
 
 
-// routes/api.php
-
+//MENU ROUTES
 use App\Http\Controllers\MenuController;
 
 
@@ -88,3 +81,8 @@ use App\Http\Controllers\NotificationController;
 Route::post('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
 Route::get('/notif-get', [NotificationController::class, 'notifGet']);
 Route::get('/notif-seen', [NotificationController::class, 'notifSeen']);
+
+
+use App\Http\Controllers\SmsController;
+
+Route::get('/sms-order-final-alert', [SmsController::class, 'smsOrderFinalAlert']);

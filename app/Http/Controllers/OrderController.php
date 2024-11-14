@@ -58,7 +58,11 @@ class OrderController extends Controller
                     ->where('mrd_user_id', $userId)
                     ->value('mrd_user_credit');
 
-                $subtotal = $userCredit - $price;
+                $deliveryCommission = DB::table('mrd_order')
+                    ->value('mrd_order_deliv_commission');
+
+
+                $subtotal = $userCredit - ($price + $deliveryCommission);
 
                 if ($subtotal > 0) {
                     $cash_to_get = 0;
@@ -132,10 +136,12 @@ class OrderController extends Controller
                     ->where('mrd_user_id', $userId)
                     ->value('mrd_user_credit');
 
+                $deliveryCommission = DB::table('mrd_setting')
+                    ->value('mrd_setting_commission_delivery');
 
 
                 //CALCULATE CASH TO GET for mrd_order table insert
-                $subtotal = $userCredit - $price;
+                $subtotal = $userCredit - ($price + $deliveryCommission);
 
                 if ($subtotal > 0) {
                     $cash_to_get = 0;
@@ -256,7 +262,12 @@ class OrderController extends Controller
                 ->where('mrd_user_id', $userId)
                 ->value('mrd_user_credit');
 
-            $subtotal = $userCredit - $totalPrice;
+
+            $deliveryCommission = DB::table('mrd_order')
+                ->value('mrd_order_deliv_commission');
+
+
+            $subtotal = $userCredit - ($totalPrice + $deliveryCommission);
 
             if ($subtotal > 0) {
                 $cash_to_get = 0;
@@ -296,7 +307,7 @@ class OrderController extends Controller
                 ->limit(1)
                 ->update([
                     'mrd_notif_quantity' => $quantityValue,
-                    'mrd_notif_total_price' => $totalPrice,
+                    'mrd_notif_total_price' => $totalPrice + $deliveryCommission,
                 ]);
 
 

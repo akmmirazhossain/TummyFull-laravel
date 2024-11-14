@@ -43,6 +43,7 @@ class DeliveryController extends Controller
                 'mrd_order.mrd_order_quantity',
                 'mrd_order.mrd_order_total_price',
                 'mrd_order.mrd_order_cash_to_get',
+                'mrd_order.mrd_order_deliv_commission',
                 'mrd_order.mrd_order_mealbox',
                 'mrd_order.mrd_order_status',
                 'mrd_user.mrd_user_id',
@@ -155,8 +156,16 @@ class DeliveryController extends Controller
             ->where('mrd_menu_id', $menuId)
             ->value('mrd_menu_period');
 
+        $quantity = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
+            ->value('mrd_order_quantity');
 
 
+        $deliveryCommission = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
+            ->value('mrd_order_deliv_commission');
+
+        $orderDelivPrice =  $orderTotalPrice + $deliveryCommission;
 
 
 
@@ -170,20 +179,20 @@ class DeliveryController extends Controller
                 'mrd_notif_user_id' =>
                 $userId,
                 'mrd_notif_message' => $notif_message,
-
-                'mrd_notif_total_price' => $notif_credit_calc,
+                'mrd_notif_quantity' => $quantity,
+                'mrd_notif_total_price' => $orderDelivPrice,
                 'mrd_notif_type' => 'delivery'
             ]);
 
 
             //COMPARE USER CREDIT WITH PRICE
-            if ($userCredit >= $orderTotalPrice) {
-                $userCreditNew = $userCredit - $orderTotalPrice;
+            if ($userCredit >= $orderDelivPrice) {
+                $userCreditNew = $userCredit - $orderDelivPrice;
                 //NOTIF INSERT
                 $notifInsert = DB::table('mrd_notification')->insert([
                     'mrd_notif_user_id' =>
                     $userId,
-                    'mrd_notif_message' => '৳' . $orderTotalPrice . ' has been paid from your wallet. New credit: ' . $userCredit . ' - ' . $orderTotalPrice . ' = ৳' . $userCreditNew,
+                    'mrd_notif_message' => '৳' . $orderDelivPrice . ' has been paid from your wallet. New credit: ' . $userCredit . ' - ' . $orderDelivPrice . ' = ৳' . $userCreditNew,
 
                     'mrd_notif_total_price' => $notif_credit_calc,
                     'mrd_notif_type' => 'order'
@@ -193,13 +202,13 @@ class DeliveryController extends Controller
             } else {
                 $userCreditNew = 0;
                 $paymentMethod = 'cod';
-                $cashToCollect = $orderTotalPrice - $userCredit;
+                $cashToCollect = $orderDelivPrice - $userCredit;
 
-                if (($userCredit != 0) && ($userCredit <= $orderTotalPrice)) {
+                if (($userCredit != 0) && ($userCredit <= $orderDelivPrice)) {
                     $notif_message =  '৳' . $userCredit . ' has been paid from wallet & ৳' . $cashToCollect . ' via cash on delivery. New credit: ৳' . $userCreditNew;
                 } else {
 
-                    $notif_message =  '৳' . $orderTotalPrice . ' has been paid via cash on delivery.';
+                    $notif_message =  '৳' . $orderDelivPrice . ' has been paid via cash on delivery.';
                 }
 
                 $notifInsert = DB::table('mrd_notification')->insert([
@@ -222,7 +231,7 @@ class DeliveryController extends Controller
                 'mrd_payment_status' =>
                 'paid',
                 'mrd_payment_amount' =>
-                $orderTotalPrice,
+                $orderDelivPrice,
                 'mrd_payment_user_id' => $userId,
 
                 'mrd_payment_order_id' => $orderId,
@@ -314,24 +323,21 @@ class DeliveryController extends Controller
             ) {
 
                 $nextOrderId = $nextOrder->mrd_order_id;
-                $nextOrderTotalPrice = $nextOrder->mrd_order_total_price;
+                $nextOrderDelivPrice = ($nextOrder->mrd_order_total_price) + $deliveryCommission;
 
                 $userCreditUpdated = DB::table('mrd_user')
                     ->where('mrd_user_id', $userId)
                     ->value('mrd_user_credit');
 
-                $userCreditUpdated = DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->value('mrd_user_credit');
 
                 if (
-                    $userCreditUpdated >= $nextOrderTotalPrice
+                    $userCreditUpdated >= $nextOrderDelivPrice
                 ) {
                     //$userCreditUpdatedNew = $userCreditUpdated - $nextOrderTotalPrice;
                     $cash_to_get = 0;
                 } else {
                     // $userCreditUpdatedNew = 0;
-                    $cash_to_get = $nextOrderTotalPrice - $userCreditUpdated;
+                    $cash_to_get = $nextOrderDelivPrice - $userCreditUpdated;
                 }
 
                 //CASH TO GET UPDATE
