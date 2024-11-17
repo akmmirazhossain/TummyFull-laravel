@@ -13,7 +13,7 @@ class LoginController extends Controller
     // Display the login form
     public function showLoginForm()
     {
-        return view('auth.login'); // Assuming you have a login.blade.php file in resources/views/auth
+        return view('auth.login');
     }
 
     // Handle the login request
@@ -39,17 +39,13 @@ class LoginController extends Controller
 
         if ($user && Hash::check($request->input('password'), $user->mrd_user_password)) {
             // Authentication successful
-            Auth::login($user);
+            Auth::login($user, true);
             return redirect()->intended('login')->with('success', 'Login successful!');
             //return back()->intended('/dashboard')->with('success', 'Login successful!');
         } else {
             // Authentication failed
             return back()->withErrors(['loginError' => 'Invalid credentials'])->withInput($request->only('mrd_user_email'));
         }
-
-
-        // Authentication failed
-        //return back()->withErrors(['loginError' => 'Invalid credentials'])->withInput($request->only('mrd_user_email'));
     }
 
     // Logout the user
