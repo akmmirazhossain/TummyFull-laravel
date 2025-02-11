@@ -104,26 +104,47 @@ class MenuController extends Controller
 
             $currentIndex++;
 
-            // Get all menu items for the current day
+            //MENU ITESM CURRENT DAY
             $menus = MenuMod::where('mrd_menu_day', $day)->get();
 
 
 
             foreach ($menus as $menu) {
-                // Get the list of food IDs from mrd_menu_food_id and remove trailing commas
+
+
+                // GET FOOD INFO FROM ID (menu table)
                 $foodIds = array_filter(explode(',', $menu->mrd_menu_food_id));
 
+                // Fetch the food items maintaining order
                 $foods = FoodMod::whereIn('mrd_food_id', $foodIds)->get();
 
-                $foodDataList = $foods->map(function ($food) {
-                    return [
-                        'food_name' => $food->mrd_food_name,
-                        'food_image' => $food->mrd_food_img
-                    ];
+                // Sort the collection based on the original order of food IDs
+                $sortedFoods = $foods->sortBy(function ($food) use ($foodIds) {
+                    return array_search($food->mrd_food_id, $foodIds);
                 });
+
+                // Group the sorted foods by type
+                $foodDataList = $sortedFoods->groupBy('mrd_food_type')->map(function ($group) {
+                    return $group->map(function ($food) {
+                        return [
+                            'food_name' => $food->mrd_food_name,
+                            'food_image' => $food->mrd_food_img
+                        ];
+                    })->values(); // Reset array keys for JSON output
+                });
+
+                // Convert the grouped collection into an ordered array
+                $orderedFoodData = collect($foodIds)->mapWithKeys(function ($foodId) use ($foodDataList, $foods) {
+                    $food = $foods->firstWhere('mrd_food_id', $foodId);
+                    return $food ? [$food->mrd_food_type => $foodDataList[$food->mrd_food_type] ?? []] : [];
+                })->toArray();
+
+
+
+
+
                 $foodData = [
                     'foods' => $foodDataList,
-
                     'price' => $menu->mrd_menu_price,
                 ];
 
