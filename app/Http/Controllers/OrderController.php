@@ -26,6 +26,8 @@ class OrderController extends Controller
         $TFLoginToken = $request->input('TFLoginToken');
         $switchValue = $request->input('switchValue');
         $quantity = $request->input('quantity');
+        $orderType = $request->input('orderType');
+        $selectedFoods = $request->input('selectedFoods');
 
 
 
@@ -50,7 +52,7 @@ class OrderController extends Controller
 
             $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
 
-            //IF ORDER EXISTS
+            //MARK: ORD EXIST
             if ($orderExistance == "enabled") {
 
                 //GET CASH TO GET VALUE
@@ -130,7 +132,7 @@ class OrderController extends Controller
             } else {
 
 
-                //NEW ORDER, INSERT
+                //MARK: NEW ORDER
 
                 $userCredit = DB::table('mrd_user')
                     ->where('mrd_user_id', $userId)
@@ -158,11 +160,23 @@ class OrderController extends Controller
                     'mrd_order_user_id' => $userId,
                     'mrd_order_menu_id' => $menuId,
                     'mrd_order_quantity' => $quantity,
+                    'mrd_order_type' => $orderType,
                     'mrd_order_mealbox' => $this->getUserMealboxById($userId),
                     'mrd_order_total_price' => $price,
                     'mrd_order_cash_to_get' => $cash_to_get,
                     'mrd_order_date' => $date
                 ]);
+
+                //if order type custom
+                if ($orderType === 'custom' && is_array($selectedFoods)) {
+                    foreach ($selectedFoods as $foodId) {
+                        DB::table('mrd_order_custom')->insert([
+                            'mrd_order_cus_order_id' => $orderId,
+                            'mrd_order_cus_item_id' => $foodId,
+                            'mrd_order_cus_date_update' => now(),
+                        ]);
+                    }
+                }
 
                 //INSERT NOTIFICATION
                 $notificationController = app(NotificationController::class);
@@ -184,10 +198,12 @@ class OrderController extends Controller
 
 
 
-                // Return a success response
+                //MARK: JSON RES
                 return response()->json([
                     'success' => true,
                     'message' => 'Order inserted successfully',
+                    'selectedFoods' => $selectedFoods,
+                    'orderType' => $orderType,
                     'orderId' => $orderId
 
                 ]);

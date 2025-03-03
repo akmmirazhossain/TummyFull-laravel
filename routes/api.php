@@ -48,7 +48,9 @@ Route::post('/quantity-changer', [OrderController::class, 'quantityChanger']);
 Route::post('/mealbox-status', [OrderController::class, 'mealboxStatApi']);
 
 
+use App\Http\Controllers\OrderFoodSwapController;
 
+Route::post('/order-food-swap', [OrderFoodSwapController::class, 'foodSwap']);
 
 use App\Http\Controllers\UserController;
 

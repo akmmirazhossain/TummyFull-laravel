@@ -30,6 +30,13 @@ class MenuController extends Controller
         $TFLoginToken = $request->query('TFLoginToken');
         $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
 
+        $customOrderIds = DB::table('mrd_order')
+            ->where('mrd_order_user_id', $userId)
+            ->where('mrd_order_type', 'custom')
+            ->pluck('mrd_order_id')
+            ->toArray();
+
+
 
         //MARK: Date calc
         $currentDay = strtolower(date('D'));
@@ -113,37 +120,29 @@ class MenuController extends Controller
 
 
                 // GET FOOD INFO FROM ID (menu table)
-                $foodIds = array_filter(explode(',', $menu->mrd_menu_food_id));
+                // $foodIds = array_filter(explode(',', $menu->mrd_menu_food_id));
 
-                // Fetch custom food IDs if conditions are met
-                $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
-                $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
-
-
-                $customFoodIds = [];
-                if ($status === 'enabled' && $orderType === 'custom') {
-
-                    $orderId = $this->getOrderId($userId, $menu->mrd_menu_id, $date);
-
-
-                    $customFoodIds = DB::table('mrd_order_custom')
-                        ->where('mrd_order_cus_order_id', $orderId)
+                if (!empty($customOrderIds)) {
+                    $foodIds = DB::table('mrd_order_custom')
+                        ->whereIn('mrd_order_cus_order_id', $customOrderIds)
                         ->pluck('mrd_order_cus_item_id')
                         ->toArray();
+                } else {
+                    $foodIds = array_filter(explode(',', $menu->mrd_menu_food_id));
                 }
 
-                // dd($customFoodIds);
+                // Fetch the food items maintaining order
+                // $foods = FoodMod::whereIn('mrd_food_id', $foodIds)->get();
 
+                // Fetch food details  
+                $foods = DB::table('mrd_food')
+                    ->whereIn('mrd_food_id', $foodIds)
+                    ->get();
 
-
-                $foods = FoodMod::whereIn('mrd_food_id', $foodIds)->get();
-
-                // Sort the collection based on the updated order
-                $sortedFoods = $foods->sortBy(function ($food) use ($foodIds, $customFoodIds) {
-                    $index = array_search($food->mrd_food_id, $customFoodIds);
-                    return $index !== false ? $index - count($foodIds) : array_search($food->mrd_food_id, $foodIds);
+                // Sort the collection based on the original order of food IDs
+                $sortedFoods = $foods->sortBy(function ($food) use ($foodIds) {
+                    return array_search($food->mrd_food_id, $foodIds);
                 });
-
 
                 // Group the sorted foods by type
                 $foodDataList = $sortedFoods->groupBy('mrd_food_type')->map(function ($group) {
@@ -155,10 +154,6 @@ class MenuController extends Controller
                         ];
                     })->values(); // Reset array keys for JSON output
                 });
-
-
-
-
 
 
 
@@ -179,11 +174,6 @@ class MenuController extends Controller
                             $foodData['id'] = $menu->mrd_menu_id;
                             $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                             $foodData['status'] = $status;
-
-                            $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
-                            $foodData['order_type'] = $orderType;
-                            // if ($status ==='enabled' && $orderType ==='custom' )
-                            // {}
                             // Get the quantity for lunch and add it to food data
                             $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
@@ -200,9 +190,6 @@ class MenuController extends Controller
                             $foodData['id'] = $menu->mrd_menu_id;
                             $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                             $foodData['status'] = $status;
-
-                            $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
-                            $foodData['order_type'] = $orderType;
                             // Get the quantity for lunch and add it to food data
                             $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
@@ -216,14 +203,6 @@ class MenuController extends Controller
                         $foodData['id'] = $menu->mrd_menu_id;
                         $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                         $foodData['status'] = $status;
-
-                        $orderType = $this->orderType(
-                            $userId,
-                            $menu->mrd_menu_id,
-                            $date,
-                            'pending'
-                        );
-                        $foodData['order_type'] = $orderType;
                         // Get the quantity for lunch and add it to food data
                         $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                         $foodData['quantity'] = $quantity;
@@ -238,9 +217,6 @@ class MenuController extends Controller
                     // Check if the order exists for dinner
                     $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                     $foodData['status'] = $status;
-
-                    $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
-                    $foodData['order_type'] = $orderType;
                     // Get the quantity for dinner and add it to food data
                     $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
                     $foodData['quantity'] = $quantity;
@@ -279,32 +255,6 @@ class MenuController extends Controller
 
         return $orderExistance ? 'enabled' : 'disabled';
     }
-
-
-    public function orderType($userId, $menuId, $date, $status)
-    {
-        $orderType = DB::table('mrd_order')
-            ->where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-            ->where('mrd_order_status', $status)
-            ->value('mrd_order_type');
-
-        return $orderType === 'custom' ? 'custom' : 'default';
-    }
-
-    public function getOrderId($userId, $menuId, $date)
-    {
-        $orderId = DB::table('mrd_order')
-            ->where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-
-            ->value('mrd_order_id');
-
-        return $orderId;
-    }
-
 
     public function getMealboxStatus($userId, $menuId, $date)
     {
