@@ -71,17 +71,25 @@ class PhoneVerificationController extends Controller
 
             $sessionToken = bin2hex(random_bytes(32));
             // If phone number DOES NOT exist, insert user
-            DB::table('mrd_user')->insert([
+            $userId = DB::table('mrd_user')->insertGetId([
                 'mrd_user_type' => 'customer',
                 'mrd_user_phone' => $phoneNumber,
                 'mrd_user_last_otp' => $hashedOtp,
                 'mrd_user_session_token' => $sessionToken,
                 'mrd_user_otp_expiration' => now()->addMinutes(5), // Set OTP expiration time
                 'mrd_user_otp_attempts' => 0, // Initialize OTP attempts
+                'mrd_user_credit' => 120, // Set initial credit to 100
                 'mrd_user_date_added' => now(),
+            ]);
 
+            // Insert notification for the new user
+            DB::table('mrd_notification')->insert([
+                'mrd_notif_user_id' => $userId,
+                'mrd_notif_message' => '🎉 Congratulations! You’ve got 120 TK credit. Your first meal is FREE! 🍛 Enjoy!',
+                'mrd_notif_type' => 'wallet', // Change this if needed
 
             ]);
+
 
             // Return a success message
             return response()->json([
