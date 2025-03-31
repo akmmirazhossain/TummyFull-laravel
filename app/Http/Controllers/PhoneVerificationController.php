@@ -2,6 +2,9 @@
 //use App\Http\Controllers\Controller;
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\SmsController;
+
+
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB; // Import DB facade
@@ -24,30 +27,8 @@ class PhoneVerificationController extends Controller
         $message = 'Your OTP is ' . $otp;
 
 
-        $url = "http://api.greenweb.com.bd/api.php?json";
-        $token = "10406160548170211634821be8233e1868988b44de23e322ff166";
-        $data = [
-            'to' => $to,
-            'message' => $message,
-            'token' => $token,
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        curl_setopt(
-            $ch,
-            CURLOPT_SSL_VERIFYPEER,
-            0
-        );
-        curl_setopt($ch, CURLOPT_ENCODING, '');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $smsResult = curl_exec($ch);
-
-        //echo $smsResult;
-        echo curl_error($ch);
-        curl_close($ch);
+        $smsController = new SmsController();
+        $smsController->sendSms($to, $message);
 
 
         // Check phone number
@@ -69,8 +50,20 @@ class PhoneVerificationController extends Controller
             return response()->json(['success' => 'Phone number already exists. OTP updated successfully'], 200);
         } else {
 
+
+            //DISCOUNT PERCENTAGE CALCULATION
+            $settings = DB::table('mrd_setting')->select('mrd_setting_meal_price', 'mrd_setting_discount_reg')->first();
+
+
+            $mealPrice = $settings->mrd_setting_meal_price; // e.g., 120
+            $discountPercentage = $settings->mrd_setting_discount_reg; // e.g., 80
+
+            // Calculate the credit value
+            $credit = round(($mealPrice * $discountPercentage) / 100);
+
+
             $sessionToken = bin2hex(random_bytes(32));
-            // If phone number DOES NOT exist, insert user
+            // Insert user with calculated credit value
             $userId = DB::table('mrd_user')->insertGetId([
                 'mrd_user_type' => 'customer',
                 'mrd_user_phone' => $phoneNumber,
@@ -78,17 +71,19 @@ class PhoneVerificationController extends Controller
                 'mrd_user_session_token' => $sessionToken,
                 'mrd_user_otp_expiration' => now()->addMinutes(5), // Set OTP expiration time
                 'mrd_user_otp_attempts' => 0, // Initialize OTP attempts
-                'mrd_user_credit' => 120, // Set initial credit to 100
+                'mrd_user_credit' => $credit, // Set calculated credit
                 'mrd_user_date_added' => now(),
             ]);
 
-            // Insert notification for the new user
-            DB::table('mrd_notification')->insert([
-                'mrd_notif_user_id' => $userId,
-                'mrd_notif_message' => '🎉 Congratulations! You’ve got 120 TK credit. Your first meal is FREE! 🍛 Enjoy!',
-                'mrd_notif_type' => 'wallet', // Change this if needed
+            // Insert notification only if credit is more than 0
+            if ($credit > 0) {
+                DB::table('mrd_notification')->insert([
+                    'mrd_notif_user_id' => $userId,
+                    'mrd_notif_message' => "🎉 You've received {$credit} TK as a welcome bonus! Enjoy your discount on your first meal. 🍛",
+                    'mrd_notif_type' => 'wallet', // Change this if needed
+                ]);
+            }
 
-            ]);
 
 
             // Return a success message

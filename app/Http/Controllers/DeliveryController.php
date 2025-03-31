@@ -309,6 +309,13 @@ class DeliveryController extends Controller
             }
 
 
+            //MARK: order delivery increment by 1. 
+            DB::table('mrd_user')
+                ->where('mrd_user_id', $userId)
+                ->increment('mrd_user_order_delivered');
+
+
+
 
             $nextOrder = DB::table('mrd_order')
                 ->where('mrd_order_user_id', $userId)

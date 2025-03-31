@@ -88,3 +88,4 @@ Route::get('/notif-seen', [NotificationController::class, 'notifSeen']);
 use App\Http\Controllers\SmsController;
 
 Route::get('/sms-order-final-alert', [SmsController::class, 'smsOrderFinalAlert']);
+Route::get('/sms-discount-new-user', [SmsController::class, 'smsDiscountNewUser']);
