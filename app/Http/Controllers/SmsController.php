@@ -100,15 +100,18 @@ class SmsController extends Controller
     public function smsDiscountNewUser()
     {
 
-        //DEACTIVATE SMS IF NULL OR 0 
+
         $settings = DB::table('mrd_setting')->first();
 
+        //DEACTIVATE SMS IF NULL OR 0 
         if (!$settings || $settings->mrd_setting_discount_new_user == 0 || is_null($settings->mrd_setting_discount_new_user)) {
             return response()->json(['message' => 'Discount is not available.']);
         }
-        // Check if mrd_user_order_delivered is 1
+        // Check if mrd_user_order_delivered is 1 to 7 (mealLimit)
+        $mealLimit = $settings->mrd_setting_discount_new_user_limit; // Fetch the dynamic meal limit
+
         $users = DB::table('mrd_user')
-            ->where('mrd_user_order_delivered', 1) // Select only users with exactly 1 - 7 meals delivered
+            ->whereBetween('mrd_user_order_delivered', [1, $mealLimit]) // Use dynamic limit
             ->pluck('mrd_user_id');
 
         if ($users->isEmpty()) {
@@ -117,13 +120,21 @@ class SmsController extends Controller
 
         $today = Carbon::today();
 
-        //CHECK IF THAT FIRST ORDER WAS TODAY
+        // Find the first order date of each user
         $userOrders = DB::table('mrd_order')
             ->whereIn('mrd_order_user_id', $users)
-            ->whereDate('mrd_order_date_insert', '=', $today)
             ->select('mrd_order_user_id', DB::raw('MIN(mrd_order_date_insert) as first_order_date'))
-            ->groupBy('mrd_order_user_id', 'mrd_order_date_insert') // Group by both user and date
+            ->groupBy('mrd_order_user_id')
             ->get();
+
+
+        //CHECK IF THAT FIRST ORDER WAS TODAY
+        // $userOrders = DB::table('mrd_order')
+        //     ->whereIn('mrd_order_user_id', $users)
+        //     ->whereDate('mrd_order_date_insert', '=', $today)
+        //     ->select('mrd_order_user_id', DB::raw('MIN(mrd_order_date_insert) as first_order_date'))
+        //     ->groupBy('mrd_order_user_id', 'mrd_order_date_insert') // Group by both user and date
+        //     ->get();
 
         if ($userOrders->isEmpty()) {
             return response()->json(['message' => 'Step 2: No orders found for eligible users.']);
@@ -133,16 +144,22 @@ class SmsController extends Controller
         $userPhones = DB::table('mrd_user')
             ->whereIn('mrd_user_id', $users)
             ->pluck('mrd_user_phone', 'mrd_user_id');
-        $settings = DB::table('mrd_setting')->first();
+        // $settings = DB::table('mrd_setting')->first();
 
         //CALUCLATE DISCOUNT PERCENTAGE FOR THE NEW USER
         $discountAmount = ($settings->mrd_setting_discount_new_user / 100) * $settings->mrd_setting_meal_price;
-        $mealLimit = $settings->mrd_setting_discount_new_user_limit;
         $dayLimit = $settings->mrd_setting_discount_new_user_day_limit;
         $newUserDiscount = $settings->mrd_setting_discount_new_user;
 
+
+        // Filter users whose first order was within the last 14 days
+        $eligibleUsers = $userOrders->filter(function ($order) use ($today, $dayLimit) {
+            return Carbon::parse($order->first_order_date)->diffInDays($today) <=  $dayLimit;
+        })->pluck('mrd_order_user_id');
+
+
         //SEND SMS TO THE NEW USERS IF THEY HAVE DISCOUNT
-        foreach ($userOrders as $order) {
+        foreach ($userOrders->whereIn('mrd_order_user_id', $eligibleUsers) as $order) {
             $userPhone = $userPhones[$order->mrd_order_user_id] ?? null; // Get the phone number
             $userId = $order->mrd_order_user_id ?? null;
 
