@@ -128,23 +128,16 @@ class SmsController extends Controller
             ->get();
 
 
-        //CHECK IF THAT FIRST ORDER WAS TODAY
-        // $userOrders = DB::table('mrd_order')
-        //     ->whereIn('mrd_order_user_id', $users)
-        //     ->whereDate('mrd_order_date_insert', '=', $today)
-        //     ->select('mrd_order_user_id', DB::raw('MIN(mrd_order_date_insert) as first_order_date'))
-        //     ->groupBy('mrd_order_user_id', 'mrd_order_date_insert') // Group by both user and date
-        //     ->get();
-
         if ($userOrders->isEmpty()) {
-            return response()->json(['message' => 'Step 2: No orders found for eligible users.']);
+            return response()->json(['message' => 'Step 2: No first order found for any users.']);
         }
 
 
+        //GET USERS PHONE NUMBER
         $userPhones = DB::table('mrd_user')
             ->whereIn('mrd_user_id', $users)
             ->pluck('mrd_user_phone', 'mrd_user_id');
-        // $settings = DB::table('mrd_setting')->first();
+
 
         //CALUCLATE DISCOUNT PERCENTAGE FOR THE NEW USER
         $discountAmount = ($settings->mrd_setting_discount_new_user / 100) * $settings->mrd_setting_meal_price;
@@ -158,27 +151,86 @@ class SmsController extends Controller
         })->pluck('mrd_order_user_id');
 
 
+
+        $latestOrders = DB::table('mrd_order')
+            ->select('mrd_order_user_id', DB::raw('MAX(mrd_order_id) as latest_order_id'))
+            ->whereIn('mrd_order_user_id', $eligibleUsers)
+            ->groupBy('mrd_order_user_id')
+            ->pluck('latest_order_id', 'mrd_order_user_id');
+
+
         //SEND SMS TO THE NEW USERS IF THEY HAVE DISCOUNT
         foreach ($userOrders->whereIn('mrd_order_user_id', $eligibleUsers) as $order) {
-            $userPhone = $userPhones[$order->mrd_order_user_id] ?? null; // Get the phone number
+
             $userId = $order->mrd_order_user_id ?? null;
+            $userPhone = $userPhones[$userId] ?? null; // Get the phone number
+            $latestOrderId = $latestOrders[$userId] ?? null; // Get latest order ID
 
-            $message = "Congrats! 🎉💰 " . intval($discountAmount) . " TK credited to your wallet! Get " . $newUserDiscount . "% off on your next " . $mealLimit . " meals! Order within " . $dayLimit . " days! 🍽️";
+            // Check if this order ID exists in the payment table with a discount
+            $hasDiscount = DB::table('mrd_payment')
+                ->where('mrd_payment_order_id', $latestOrderId)
+                ->where('mrd_payment_type', 'discount')
+                ->exists();
+
+            if (!$hasDiscount) {
 
 
-            echo "User ID: {$order->mrd_order_user_id}, Phone: {$userPhone}, Message: {$message} <br>";
+                // Get the user's delivered meal count
+                $deliveredMeals = DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->value('mrd_user_order_delivered');
 
-            $this->insertSms($userId, $userPhone, $message, 'discount');
+                // Calculate remaining meals and days
+                $remainingMeals = max(0, $mealLimit - $deliveredMeals);
+                $firstOrderDate = Carbon::parse($order->first_order_date);
+                $remainingDays = max(0, $dayLimit - $firstOrderDate->diffInDays($today));
+
+
+                //MESSAGE
+                $message = "Congrats! 🎉💰 " . intval($discountAmount) . " TK credited to your wallet! Get " . $newUserDiscount . "% off on your next " . $remainingMeals . " meals! Order within " . $remainingDays . " days! 🍽️";
+
+                echo "User ID: {$order->mrd_order_user_id}, Phone: {$userPhone}, Message: {$message} <br>";
+
+
+                // Insert discount record in mrd_payment
+                DB::table('mrd_payment')->insert([
+                    'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
+                    'mrd_payment_amount' => intval($discountAmount),
+                    'mrd_payment_user_id' => $userId,
+                    'mrd_payment_order_id' => $latestOrderId,
+                    'mrd_payment_for' => 'order', // Since it's for meal orders
+                    'mrd_payment_method' => 'system', // Since the system is applying the discount
+                    'mrd_payment_type' => 'discount', // Marked as discount
+                    'mrd_payment_message' => 'New user',
+                    'mrd_payment_date_paid' => now(), // Timestamp of the discount application
+                ]);
+
+                // Insert notification for the user
+                DB::table('mrd_notification')->insert([
+                    'mrd_notif_user_id' => $userId,
+                    'mrd_notif_order_id' => $latestOrderId,
+                    'mrd_notif_message' => $message,
+                    'mrd_notif_type' => 'discount',
+                    'mrd_notif_date_added' => now(),
+                ]);
+
+                // Update user credit balance
+                DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->increment('mrd_user_credit', intval($discountAmount));
+
+
+                //MARK: Insert SMS
+                //$response = $this->sendSms($userPhone, $message); // Send SMS
+
+                $this->sendSms($userPhone, $message); // Send SMS
+                $this->insertSms($userId, $userPhone, $message, 'discount');
+            } else {
+                $message = "No discount available for any users at the moment.";
+
+                return response()->json(['message' => $message]);
+            }
         }
-
-        // foreach ($userOrders as $order) {
-        //     $userPhone = $userPhones[$order->mrd_order_user_id];  // Get the phone number
-        //     $message = "Congrats! 🎉💰 60 TK credited to your wallet! Get 50% off on your next 7 meals! Order within 14 days! 🍽️";
-        //     $response = $this->sendSms($userPhone, $message); // Send SMS
-        // }
-
-
-        // return response()->json(['sms_response' => $response]);
     }
 
     public function insertSms($userId, $phone, $message, $type, $status = 'sent')
