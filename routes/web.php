@@ -42,6 +42,8 @@ Route::post('/customer_list', [AdminCustomerController::class, 'customer_list'])
 use App\Http\Controllers\Web\AdminUserController;
 
 Route::get('/user_list', [AdminUserController::class, 'user_list'])->name('user_list');
+Route::get('/user_list/{id}', [AdminUserController::class, 'show'])->name('user.show');
+
 
 //CHEF VIEWS
 use App\Http\Controllers\Web\AdminChefController;
@@ -52,4 +54,7 @@ Route::post('/chef-pay', [AdminChefController::class, 'chef_pay'])->name('chef-p
 Route::get('/chef-payment-history', [AdminChefController::class, 'chef_payment_history'])->name('chef-payment-history');
 
 
-// use App\Http\Controllers\Web\AdminChefController;
+//ADMIN NOTIF ROUTES
+use App\Http\Controllers\Web\AdminNotifController;
+
+Route::get('/notif-list', [AdminNotifController::class, 'notif_list'])->name('notif-list');

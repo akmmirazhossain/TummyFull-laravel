@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SmsController;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +79,7 @@ class AdminWalletController extends Controller
                 'mrd_payment_status' => 'paid',
                 'mrd_payment_amount' => $amount,
                 'mrd_payment_user_id' => $userId,
+                'mrd_payment_method' => 'mfs',
                 'mrd_payment_for' => 'wallet',
                 'mrd_payment_date_paid' => now(), // Assuming you want to record the current date and time
             ]);
@@ -105,6 +107,7 @@ class AdminWalletController extends Controller
 
 
                 $delivComm = DB::table('mrd_order')
+                    ->where('mrd_order_id', $nextOrderId)
                     ->value('mrd_order_deliv_commission');
 
                 if (
@@ -121,6 +124,16 @@ class AdminWalletController extends Controller
                 $cashToGet = DB::table('mrd_order')
                     ->where('mrd_order_id', $nextOrderId)
                     ->update(['mrd_order_cash_to_get' => $cash_to_get]);
+
+
+
+                $message = '(dalbhath.com) You have successfully recharged your wallet with ৳' . $amount . '.';
+
+                //SEND SMS
+                $smsController = new SmsController();
+
+                $smsController->insertSms($userId, $phone, $message, 'recharge');
+                $smsController->sendSms($phone,  $message);
             }
 
             return response()->json(['success' => 'Wallet recharged successfully', 'phone' => $phone, 'amount' => $amount]);

@@ -170,7 +170,7 @@ class DeliveryController extends Controller
 
 
         if ($delivStatus == 'delivered') {
-            $notif_message =  "Your " . $menuPeriod . " has been delivered.";
+            $notif_message =  "Your " . $menuPeriod . " has been successfully delivered.";
             $notif_credit_calc = null;
 
 
@@ -250,10 +250,14 @@ class DeliveryController extends Controller
 
 
 
-            //MEALBOX: Logics
+            //MARK: MEALBOX
             //Increment the number of mealboxes the customer has
+
+            //GET USER INFO
             $user = DB::table('mrd_user')->where('mrd_user_id', $userId)->first();
 
+
+            //INCREMENT MEALBOX COUNT IF USER MEALBOX IS ACTIVATED AND HAS LESS THAN 2
             if ($user->mrd_user_mealbox == 1 && $user->mrd_user_has_mealbox < 2) {
 
                 DB::table('mrd_user')
@@ -264,24 +268,49 @@ class DeliveryController extends Controller
             }
 
 
-            // $mealboxesReturned = 2; // Number of mealboxes returned (can be 1 or 2)
-            if ($user->mrd_user_has_mealbox >= $mboxPick) {
-                // Decrease the number of mealboxes based on how many are returned
+            // Decrease the number of mealboxes based on how many are returned
+            if ($mboxPick > 0 && $user->mrd_user_has_mealbox >= $mboxPick) {
+
                 DB::table('mrd_user')
                     ->where('mrd_user_id', $userId)
                     ->decrement('mrd_user_has_mealbox', $mboxPick);
+
+                // Increase credit by 10 or 20 depending on mboxPick
+                $creditToAdd = $mboxPick * 10;
+
+                DB::table('mrd_user')
+                    ->where('mrd_user_id', $userId)
+                    ->increment('mrd_user_credit', $creditToAdd);
+
+
+                // Insert discount record in mrd_payment
+                DB::table('mrd_payment')->insert([
+                    'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
+                    'mrd_payment_amount' => $creditToAdd,
+                    'mrd_payment_user_id' => $userId,
+                    'mrd_payment_order_id' => $orderId,
+                    'mrd_payment_for' => 'mealbox', // Since it's for meal orders
+                    'mrd_payment_method' => 'system', // Since the system is applying the discount
+                    'mrd_payment_type' => 'cashback', // Marked as discount
+                    'mrd_payment_date_paid' => now(), // Timestamp of the discount application
+                ]);
+
+
+                $mrd_notif_message = "You’ve received ৳" . $creditToAdd . " cashback for returning your mealbox.";
+                // Insert notification for the user
+                DB::table('mrd_notification')->insert([
+                    'mrd_notif_user_id' => $userId,
+                    'mrd_notif_order_id' => $orderId,
+                    'mrd_notif_message' => $mrd_notif_message,
+                    'mrd_notif_type' => 'cashback',
+                    'mrd_notif_date_added' => now(),
+                ]);
             }
 
-            //IF Mealbox actitvated, and HAS mealbox < 3, then give mealbox
-            //IF THE DELVIERY PERSON PICKED THE MEALBOX or NOT, update it
-            // $hasMealboxUpdate = DB::table('mrd_user')
-            //     ->where('mrd_user_id', $userId)
-            //     ->update([
-            //         'mrd_user_has_mealbox' => $giveMealbox
-            //     ]);
 
 
-            //IF THE USER HAS PAID FOT THE MEALBOX UPDATE/INSERT 
+
+            //IF THE USER HAS PAID FOR THE MEALBOX UPDATE/INSERT 
             if ($user->mrd_user_mealbox == 1 && $user->mrd_user_mealbox_paid == 0) {
 
                 //GET MEALBOX PRICE

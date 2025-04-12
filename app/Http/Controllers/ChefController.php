@@ -51,6 +51,7 @@ class ChefController extends Controller
                 'mrd_user.mrd_user_phone',
                 'mrd_user.mrd_user_address'
             )
+            ->where('mrd_order.mrd_order_status', 'pending')
             ->whereDate('mrd_order.mrd_order_date', $date)
             ->when($filterPeriod, fn($query) => $query->where('mrd_menu.mrd_menu_period', $filterPeriod))
             ->orderByDesc('mrd_order.mrd_order_id')

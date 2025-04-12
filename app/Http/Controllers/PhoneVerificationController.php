@@ -59,7 +59,7 @@ class PhoneVerificationController extends Controller
             $discountPercentage = $settings->mrd_setting_discount_reg; // e.g., 80
 
             // Calculate the credit value
-            $credit = round(($mealPrice * $discountPercentage) / 100);
+            $bonus = round(($mealPrice * $discountPercentage) / 100);
 
 
             $sessionToken = bin2hex(random_bytes(32));
@@ -71,16 +71,29 @@ class PhoneVerificationController extends Controller
                 'mrd_user_session_token' => $sessionToken,
                 'mrd_user_otp_expiration' => now()->addMinutes(5), // Set OTP expiration time
                 'mrd_user_otp_attempts' => 0, // Initialize OTP attempts
-                'mrd_user_credit' => $credit, // Set calculated credit
+                'mrd_user_credit' => $bonus, // Set calculated credit
                 'mrd_user_date_added' => now(),
             ]);
 
             // Insert notification only if credit is more than 0
-            if ($credit > 0) {
+            if ($bonus > 0) {
                 DB::table('mrd_notification')->insert([
                     'mrd_notif_user_id' => $userId,
-                    'mrd_notif_message' => "🎉 You've received {$credit} TK as a welcome bonus! Enjoy your discount on your first meal. 🍛",
+                    'mrd_notif_message' => "🎉 You've received {$bonus} TK as a welcome bonus! Enjoy your discount on your first meal. 🍛",
                     'mrd_notif_type' => 'wallet', // Change this if needed
+                ]);
+
+
+                // Insert discount record in mrd_payment
+                DB::table('mrd_payment')->insert([
+                    'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
+                    'mrd_payment_amount' => intval($bonus),
+                    'mrd_payment_user_id' => $userId,
+                    'mrd_payment_for' => 'wallet', // Since it's for meal orders
+                    'mrd_payment_method' => 'system', // Since the system is applying the discount
+                    'mrd_payment_type' => 'discount', // Marked as discount
+                    'mrd_payment_message' => 'Reg Discount',
+                    'mrd_payment_date_paid' => now(), // Timestamp of the discount application
                 ]);
             }
 

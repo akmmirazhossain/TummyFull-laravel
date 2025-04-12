@@ -316,7 +316,7 @@ class AdminAnalyticsController extends Controller
             mrd_order
         JOIN 
             mrd_user ON mrd_order.mrd_order_user_id = mrd_user.mrd_user_id
-            ORDER BY mrd_order.mrd_order_date DESC
+            ORDER BY mrd_order.mrd_order_date_insert DESC
     ";
 
         $orders = DB::select($sql);

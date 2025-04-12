@@ -61,6 +61,9 @@ class OrderController extends Controller
                     ->value('mrd_user_credit');
 
                 $deliveryCommission = DB::table('mrd_order')
+                    ->where('mrd_order_menu_id', $menuId)
+                    ->where('mrd_order_user_id', $userId)
+                    ->where('mrd_order_date', $date)
                     ->value('mrd_order_deliv_commission');
 
 
@@ -280,6 +283,9 @@ class OrderController extends Controller
 
 
             $deliveryCommission = DB::table('mrd_order')
+                ->where('mrd_order_menu_id', $menuId)
+                ->where('mrd_order_user_id', $userId)
+                ->where('mrd_order_date', $date)
                 ->value('mrd_order_deliv_commission');
 
 

@@ -14,6 +14,9 @@ class NotificationController extends Controller
     //MARK: PLACE ORDER
     public function notifOrderPlace(Request $request)
     {
+
+
+
         $menuId = $request->input('menuId');
         $date = $request->input('date');
         $price = $request->input('price');
@@ -23,22 +26,17 @@ class NotificationController extends Controller
         $quantity = $request->input('quantity');
 
 
+
+
         // Fetch user ID based on session token
         $userId = DB::table('mrd_user')
             ->where('mrd_user_session_token', $TFLoginToken)
             ->value('mrd_user_id');
 
 
-        // $userCredit = DB::table('mrd_user')
-        //     ->where('mrd_user_session_token', $TFLoginToken)
-        //     ->value('mrd_user_credit');
 
-        // $menuPrice = DB::table('mrd_menu')
-        //     ->where('mrd_menu_id', $menuId)
-        //     ->value('mrd_menu_price');
-
-        $comissionDeliv =
-            DB::table('mrd_order')
+        $commissionDeliv = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
             ->value('mrd_order_deliv_commission');
 
         $menuPeriod = DB::table('mrd_menu')
@@ -64,7 +62,7 @@ class NotificationController extends Controller
 
         if ($switchValue == 1) {
             $optionalFields = [
-                'mrd_notif_total_price' => $price + $comissionDeliv,
+                'mrd_notif_total_price' => $price + $commissionDeliv,
                 'mrd_notif_quantity' => $quantity,
             ];
         }

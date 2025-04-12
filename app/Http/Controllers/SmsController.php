@@ -23,8 +23,8 @@ class SmsController extends Controller
         }
 
 
-        $helpline = DB::table('mrd_setting')
-            ->value('mrd_setting_helpline');
+        // $helpline = DB::table('mrd_setting')
+        //     ->value('mrd_setting_helpline');
 
         // echo $lunchTimeLimit . '<br><br>';
 
@@ -35,6 +35,8 @@ class SmsController extends Controller
             ->whereDate('mrd_order.mrd_order_date', Carbon::today())
             ->select(
                 'mrd_order.mrd_order_id',
+                'mrd_order.mrd_order_user_id',
+                'mrd_order.mrd_order_deliv_commission',
                 'mrd_order.mrd_order_quantity',
                 'mrd_order.mrd_order_total_price',
                 'mrd_menu.mrd_menu_period',
@@ -44,7 +46,7 @@ class SmsController extends Controller
             ->get();
 
 
-        // Fetch settings for lunch and dinner delivery times and time limits
+
         // Fetch settings for lunch and dinner delivery times and time limits
         $settings = DB::table('mrd_setting')
             ->select(
@@ -65,7 +67,10 @@ class SmsController extends Controller
             // Check if it's before lunch limit to only send lunch reminders
             if ($currentTime->lessThanOrEqualTo(Carbon::createFromTimeString($settings->mrd_setting_time_limit_lunch))) {
                 if ($order->mrd_menu_period === 'lunch') {
-                    $message = "(dalbhath.com) 🍛 You have a lunch order today. Qty: {$order->mrd_order_quantity}, Price: ৳{$order->mrd_order_total_price}"; // Include phone number
+
+                    $totalPrice = $order->mrd_order_total_price + $order->mrd_order_deliv_commission;
+
+                    $message = "(dalbhath.com) 🍛 You have a lunch order today. Qty: {$order->mrd_order_quantity}, Price: ৳{$totalPrice}."; // Include phone number
 
                     echo $message . "<br>";
 
@@ -82,7 +87,9 @@ class SmsController extends Controller
             ) {
                 if ($order->mrd_menu_period === 'dinner') {
 
-                    $message = "(dalbhath.com) 🍛 You have a dinner order today. Qty: {$order->mrd_order_quantity}, Price: ৳{$order->mrd_order_total_price}"; // Include phone number
+                    $totalPrice = $order->mrd_order_total_price + $order->mrd_order_deliv_commission;
+
+                    $message = "(dalbhath.com) 🍛 You have a dinner order today. Qty: {$order->mrd_order_quantity}, Price: ৳{$totalPrice}."; // Include phone number
 
                     echo $message . "<br>";
 
@@ -114,8 +121,10 @@ class SmsController extends Controller
             ->whereBetween('mrd_user_order_delivered', [1, $mealLimit]) // Use dynamic limit
             ->pluck('mrd_user_id');
 
+        // dd($users);
+
         if ($users->isEmpty()) {
-            return response()->json(['message' => 'Step 1: No eligible users found.']);
+            return response()->json(['message' => 'Step 1: No user found with mrd_user_order_delivered range']);
         }
 
         $today = Carbon::today();
@@ -159,6 +168,7 @@ class SmsController extends Controller
             ->pluck('latest_order_id', 'mrd_order_user_id');
 
 
+        // dd($latestOrders);
         //SEND SMS TO THE NEW USERS IF THEY HAVE DISCOUNT
         foreach ($userOrders->whereIn('mrd_order_user_id', $eligibleUsers) as $order) {
 
@@ -172,8 +182,11 @@ class SmsController extends Controller
                 ->where('mrd_payment_type', 'discount')
                 ->exists();
 
+            echo $userId . ", Lastest order: " . $latestOrderId . ", Has discount: " . $hasDiscount . "</br>";
+
             if (!$hasDiscount) {
 
+                echo 'Inside has <br>';
 
                 // Get the user's delivered meal count
                 $deliveredMeals = DB::table('mrd_user')
@@ -187,10 +200,13 @@ class SmsController extends Controller
 
 
                 //MESSAGE
-                $message = "Congrats! 🎉💰 " . intval($discountAmount) . " TK credited to your wallet! Get " . $newUserDiscount . "% off on your next " . $remainingMeals . " meals! Order within " . $remainingDays . " days! 🍽️";
+                $message = "(dalbhath.com) Congrats! You’ve received ৳" . intval($discountAmount) . " in your Dalbhath wallet as a discount! Order within " . $remainingDays . " days for more rewards!";
 
-                echo "User ID: {$order->mrd_order_user_id}, Phone: {$userPhone}, Message: {$message} <br>";
+                $mrd_notif_message = "Congrats! You’ve received ৳" . intval($discountAmount) . " in your Dalbhath wallet as a discount! Order within " . $remainingDays . " days for more rewards!";
 
+                // echo "User ID: {$order->mrd_order_user_id}, Phone: {$userPhone}, Message: {$message} <br>";
+
+                echo 'after message compose <br><br>';
 
                 // Insert discount record in mrd_payment
                 DB::table('mrd_payment')->insert([
@@ -209,7 +225,7 @@ class SmsController extends Controller
                 DB::table('mrd_notification')->insert([
                     'mrd_notif_user_id' => $userId,
                     'mrd_notif_order_id' => $latestOrderId,
-                    'mrd_notif_message' => $message,
+                    'mrd_notif_message' => $mrd_notif_message,
                     'mrd_notif_type' => 'discount',
                     'mrd_notif_date_added' => now(),
                 ]);
@@ -220,16 +236,66 @@ class SmsController extends Controller
                     ->increment('mrd_user_credit', intval($discountAmount));
 
 
+                //START --- SYNC (CASH TO GET) WITH THE UPCOMING PENDING ORDER
+                //MARK: Sync Cash
+                //GET OLDEST PENDING ORDER
+                $nextOrder = DB::table('mrd_order')
+                    ->where('mrd_order_user_id', $userId)
+                    ->where('mrd_order_status', 'pending')
+                    ->orderBy('mrd_order_date', 'asc')
+                    ->first();
+
+                if ($nextOrder) {
+
+                    $nextOrderId = $nextOrder->mrd_order_id;
+                    $nextOrderTotalPrice = $nextOrder->mrd_order_total_price;
+
+
+                    //GET UPDATED CREDIT 
+                    $userCreditUpdated = DB::table('mrd_user')
+                        ->where(
+                            'mrd_user_id',
+                            $userId
+                        )
+                        ->value('mrd_user_credit');
+
+
+                    $delivComm = DB::table('mrd_order')
+                        ->where('mrd_order_id', $nextOrderId)
+                        ->value('mrd_order_deliv_commission');
+
+                    //IF USERS CREDIT (500) >= Next Order price (200) + Delievery charge (30)
+                    if (
+                        $userCreditUpdated >= ($nextOrderTotalPrice + $delivComm)
+                    ) {
+                        //$userCreditUpdatedNew = $userCreditUpdated - $nextOrderTotalPrice;
+                        $cash_to_get = 0;
+                    } else {
+
+                        //IF USERS CREDIT (100) >= Next Order price (200) + Delievery charge (30)
+
+                        $cash_to_get = ($nextOrderTotalPrice + $delivComm) - $userCreditUpdated;
+                    }
+
+                    //CASH TO GET UPDATE
+                    $cashToGet = DB::table('mrd_order')
+                        ->where('mrd_order_id', $nextOrderId)
+                        ->update(['mrd_order_cash_to_get' => $cash_to_get]);
+                }
+                //END --- SYNC CASH TO GET WITH THE UPCOMING PENDING ORDER
+
+
                 //MARK: Insert SMS
                 //$response = $this->sendSms($userPhone, $message); // Send SMS
 
                 $this->sendSms($userPhone, $message); // Send SMS
                 $this->insertSms($userId, $userPhone, $message, 'discount');
-            } else {
-                $message = "No discount available for any users at the moment.";
-
-                return response()->json(['message' => $message]);
             }
+            // else {
+            //     $message = "No discount available for any users at the moment.";
+
+            //     return response()->json(['message' => $message]);
+            // }
         }
     }
 

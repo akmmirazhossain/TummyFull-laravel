@@ -28,4 +28,13 @@ class AdminUserController extends Controller
 
         return view('user_list', compact('users'));
     }
+
+
+    public function show($id)
+    {
+        $user = DB::table('mrd_user')->where('mrd_user_id', $id)->first();
+        $orderCount = DB::table('mrd_order')->where('mrd_order_user_id', $id)->count();
+
+        return view('user_show', compact('user', 'orderCount'));
+    }
 }

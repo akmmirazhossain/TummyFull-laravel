@@ -80,7 +80,7 @@ Route::post('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
 
 use App\Http\Controllers\NotificationController;
 
-Route::post('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
+Route::get('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
 Route::get('/notif-get', [NotificationController::class, 'notifGet']);
 Route::get('/notif-seen', [NotificationController::class, 'notifSeen']);
 
@@ -89,3 +89,8 @@ use App\Http\Controllers\SmsController;
 
 Route::get('/sms-order-final-alert', [SmsController::class, 'smsOrderFinalAlert']);
 Route::get('/sms-discount-new-user', [SmsController::class, 'smsDiscountNewUser']);
+
+
+use App\Http\Controllers\MealDisableController;
+
+Route::get('/disabled-meals', [MealDisableController::class, 'getDisabledMeals']);
