@@ -32,7 +32,7 @@ Route::get('/menu/{menuId}', [MenuController::class, 'getMenuById']);
 use App\Http\Controllers\SettingController;
 
 Route::get('/setting', [SettingController::class, 'serverSettings']);
-Route::post('/mealbox-switch', [SettingController::class, 'mealboxSwitch']);
+
 
 
 use App\Http\Controllers\PhoneVerificationController;
@@ -45,7 +45,12 @@ use App\Http\Controllers\OrderController;
 
 Route::post('/order-place', [OrderController::class, 'orderPlace']);
 Route::post('/quantity-changer', [OrderController::class, 'quantityChanger']);
-Route::post('/mealbox-status', [OrderController::class, 'mealboxStatApi']);
+
+
+use App\Http\Controllers\MealboxController;
+
+Route::post('/mealbox-status', [MealboxController::class, 'mealboxStatApi']);
+Route::post('/mealbox-switch', [MealboxController::class, 'mealboxSwitch']);
 
 
 use App\Http\Controllers\OrderFoodSwapController;
@@ -58,9 +63,9 @@ Route::get('/user-fetch', [UserController::class, 'userFetch']);
 Route::post('/user-update', [UserController::class, 'userUpdate']);
 
 
-use App\Http\Controllers\LogController;
+// use App\Http\Controllers\LogController;
 
-Route::get('/mealbook', [LogController::class, 'mealBook']);
+// Route::get('/mealbook', [LogController::class, 'mealBook']);
 
 
 use App\Http\Controllers\ChefController;
@@ -80,7 +85,7 @@ Route::post('/delivery-update', [DeliveryController::class, 'deliveryUpdate']);
 
 use App\Http\Controllers\NotificationController;
 
-Route::get('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
+// Route::get('/notif-order-place', [NotificationController::class, 'notifOrderPlace']);
 Route::get('/notif-get', [NotificationController::class, 'notifGet']);
 Route::get('/notif-seen', [NotificationController::class, 'notifSeen']);
 
@@ -94,3 +99,7 @@ Route::get('/sms-discount-new-user', [SmsController::class, 'smsDiscountNewUser'
 use App\Http\Controllers\MealDisableController;
 
 Route::get('/disabled-meals', [MealDisableController::class, 'getDisabledMeals']);
+
+
+//TESTER CONTROLLER
+Route::get('/test-cash-to-get', [\App\Http\Controllers\TesterController::class, 'testCashToGet']);

@@ -9,6 +9,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\OrderMod;
 
+//IMPORT SERVICES
+
+use App\Services\CreditService;
+use App\Services\MealboxService;
+use App\Services\OrderService;
+
+use App\Services\ResponseService;
+
 
 class MenuController extends Controller
 {
@@ -27,8 +35,15 @@ class MenuController extends Controller
 
     public function index(Request $request)
     {
+
+        $orderService = new OrderService();
+        $mealboxService = new MealboxService();
+
+
         $TFLoginToken = $request->query('TFLoginToken');
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
 
 
         //MARK: Date calc
@@ -116,14 +131,14 @@ class MenuController extends Controller
                 $foodIds = array_filter(explode(',', $menu->mrd_menu_food_id));
 
                 // Fetch custom food IDs if conditions are met
-                $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
-                $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
+                $status = $orderService->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                $orderType = $orderService->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
 
 
                 $customFoodIds = [];
                 if ($status === 'enabled' && $orderType === 'custom') {
 
-                    $orderId = $this->getOrderId($userId, $menu->mrd_menu_id, $date);
+                    $orderId = $orderService->getOrderId($userId, $menu->mrd_menu_id, $date);
 
 
                     $customFoodIds = DB::table('mrd_order_custom')
@@ -177,18 +192,18 @@ class MenuController extends Controller
 
                             // Check if the order exists for lunch
                             $foodData['id'] = $menu->mrd_menu_id;
-                            $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                            $status = $orderService->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                             $foodData['status'] = $status;
 
-                            $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
+                            $orderType = $orderService->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
                             $foodData['order_type'] = $orderType;
                             // if ($status ==='enabled' && $orderType ==='custom' )
                             // {}
                             // Get the quantity for lunch and add it to food data
-                            $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                            $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
 
-                            $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                            $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
                             $foodData['mealbox'] = $mealboxStatus;
                             $dayData['lunch'] = $foodData;
                         }
@@ -198,15 +213,15 @@ class MenuController extends Controller
 
                             // Check if the order exists for lunch
                             $foodData['id'] = $menu->mrd_menu_id;
-                            $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                            $status = $orderService->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                             $foodData['status'] = $status;
 
-                            $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
+                            $orderType = $orderService->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
                             $foodData['order_type'] = $orderType;
                             // Get the quantity for lunch and add it to food data
-                            $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                            $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
-                            $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                            $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
                             $foodData['mealbox'] = $mealboxStatus;
                             $dayData['lunch'] = $foodData;
                         }
@@ -214,10 +229,10 @@ class MenuController extends Controller
 
                         // Check if the order exists for lunch
                         $foodData['id'] = $menu->mrd_menu_id;
-                        $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                        $status = $orderService->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                         $foodData['status'] = $status;
 
-                        $orderType = $this->orderType(
+                        $orderType = $orderService->orderType(
                             $userId,
                             $menu->mrd_menu_id,
                             $date,
@@ -225,9 +240,9 @@ class MenuController extends Controller
                         );
                         $foodData['order_type'] = $orderType;
                         // Get the quantity for lunch and add it to food data
-                        $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                        $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                         $foodData['quantity'] = $quantity;
-                        $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                        $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
                         $foodData['mealbox'] = $mealboxStatus;
                         $dayData['lunch'] = $foodData;
                     }
@@ -236,15 +251,15 @@ class MenuController extends Controller
 
 
                     // Check if the order exists for dinner
-                    $status = $this->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
+                    $status = $orderService->getOrderStatus($userId, $menu->mrd_menu_id, $date, 'pending');
                     $foodData['status'] = $status;
 
-                    $orderType = $this->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
+                    $orderType = $orderService->orderType($userId, $menu->mrd_menu_id, $date, 'pending');
                     $foodData['order_type'] = $orderType;
                     // Get the quantity for dinner and add it to food data
-                    $quantity = $this->getQuantity($userId, $menu->mrd_menu_id, $date);
+                    $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                     $foodData['quantity'] = $quantity;
-                    $mealboxStatus = $this->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                    $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
                     $foodData['mealbox'] = $mealboxStatus;
                     $dayData['dinner'] = $foodData;
                 }
@@ -265,79 +280,5 @@ class MenuController extends Controller
         $nextIndex = ($currentIndex + 1) % 7;
 
         return $daysOfWeek[$nextIndex];
-    }
-
-
-    public  function getOrderStatus($userId, $menuId, $date, $status)
-    {
-        // Check if the order exists
-        $orderExistance = OrderMod::where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-            ->where('mrd_order_status', $status)
-            ->exists();
-
-        return $orderExistance ? 'enabled' : 'disabled';
-    }
-
-
-    public function orderType($userId, $menuId, $date, $status)
-    {
-        $orderType = DB::table('mrd_order')
-            ->where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-            ->where('mrd_order_status', $status)
-            ->value('mrd_order_type');
-
-        return $orderType === 'custom' ? 'custom' : 'default';
-    }
-
-    public function getOrderId($userId, $menuId, $date)
-    {
-        $orderId = DB::table('mrd_order')
-            ->where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-
-            ->value('mrd_order_id');
-
-        return $orderId;
-    }
-
-
-    public function getMealboxStatus($userId, $menuId, $date)
-    {
-        // Query to retrieve mrd_order_status using DB facade
-        $mealboxStatus = DB::table('mrd_order')
-            ->where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-            ->value('mrd_order_mealbox');
-
-        return $mealboxStatus;
-    }
-
-
-    private function getQuantity($userId, $menuId, $date)
-    {
-        // Retrieve the order and get the quantity
-        $order = OrderMod::where('mrd_order_user_id', $userId)
-            ->where('mrd_order_menu_id', $menuId)
-            ->where('mrd_order_date', $date)
-            ->first();
-
-        // Return the quantity if order exists, otherwise return 0
-        return $order ? $order->mrd_order_quantity : 0;
-    }
-
-
-    private function getMenuPeriod($menuId)
-    {
-        $menuPeriod = DB::table('mrd_menu')
-            ->where('mrd_menu_id', $menuId)
-            ->value('mrd_menu_period');
-
-        echo $menuPeriod;
     }
 }

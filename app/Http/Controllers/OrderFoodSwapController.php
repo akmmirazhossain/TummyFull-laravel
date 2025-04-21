@@ -21,7 +21,9 @@ class OrderFoodSwapController extends Controller
         $finalFoods = $request->input('finalFoods');
 
         $TFLoginToken = $request->input('TFLoginToken');
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
 
         // Get order ID
         $orderId = DB::table('mrd_order')

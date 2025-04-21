@@ -2,12 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\MenuController;
+
+
+
+
 use Illuminate\Http\Request;
-use App\Http\Controllers\NotificationController;
+
 use \App\Models\OrderMod;
+use App\Services\CreditService;
+use App\Services\MealboxService;
+use App\Services\ResponseService;
+use App\Services\NotifService;
+use App\Services\OrderService;
 use Illuminate\Support\Facades\DB;
+
+
+
 use Exception;
+
+
+
 
 
 class OrderController extends Controller
@@ -15,14 +29,14 @@ class OrderController extends Controller
 
 
 
-    //MARK: PLACE ORDER
+    //MARK:ORDER PLACE 
     public function orderPlace(Request $request)
     {
 
-        $menuController = new MenuController();
-        $menuId = $request->input('menuId');
+
+
         $date = $request->input('date');
-        $price = $request->input('price');
+        $menuId = $request->input('menuId');
         $TFLoginToken = $request->input('TFLoginToken');
         $switchValue = $request->input('switchValue');
         $quantity = $request->input('quantity');
@@ -31,51 +45,48 @@ class OrderController extends Controller
 
 
 
+        $CreditService = new CreditService();
+        $NotifService = new NotifService();
+        $OrderService = new OrderService();
+        $MealboxService = new MealboxService();
+
+
+
+
+        //GET SETTINGS TABLE DATA
+
+        $pricePerMeal = DB::table('mrd_setting')->value('mrd_setting_meal_price');
 
 
         // Fetch user ID based on session token
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
             ->value('mrd_user_id');
+
+
+
+        $totalPrice = $CreditService->totalPrice($userId, $quantity);
+
 
         // Check if the user ID is fetched successfully
         if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to retrieve user ID '
-            ]);
+            return ResponseService::error('Unable to retrieve user ID');
         }
 
 
 
-        // Insert Data if switchValue is true
+
+        // MARK: SWITCH IS TRUE
         if ($switchValue == '1') {
 
-            $orderExistance = $menuController->getOrderStatus($userId, $menuId, $date, 'cancelled');
+            $orderExistance = $OrderService->getOrderStatus($userId, $menuId, $date, 'cancelled');
 
-            //MARK: ORD EXIST
+            //MARK: ORDER EXIST
             if ($orderExistance == "enabled") {
 
-                //GET CASH TO GET VALUE
-                $userCredit = DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->value('mrd_user_credit');
+                //IF THE ORDER EXISTS THEN PERFROM THESE FUNCTIONS
 
-                $deliveryCommission = DB::table('mrd_order')
-                    ->where('mrd_order_menu_id', $menuId)
-                    ->where('mrd_order_user_id', $userId)
-                    ->where('mrd_order_date', $date)
-                    ->value('mrd_order_deliv_commission');
-
-
-                $subtotal = $userCredit - ($price + $deliveryCommission);
-
-                if ($subtotal > 0) {
-                    $cash_to_get = 0;
-                } else {
-
-                    $cash_to_get = abs($subtotal);
-                }
-
+                $cashToGet = $CreditService->cashToGet($userId, $quantity);
 
                 //UPDATE ORDER IF ORDER EXISTS
                 $updatedRows = DB::table('mrd_order')
@@ -83,14 +94,15 @@ class OrderController extends Controller
                     ->where('mrd_order_user_id', $userId)
                     ->where('mrd_order_date', $date)
                     ->update([
-                        'mrd_order_total_price' => $price,
-                        'mrd_order_mealbox' => $this->getUserMealboxById($userId),
+                        'mrd_order_total_price' => $pricePerMeal,
+                        'mrd_order_mealbox' => $MealboxService->extraMealbox($userId, $quantity),
                         'mrd_order_quantity' => $quantity,
-                        'mrd_order_cash_to_get' => $cash_to_get,
+                        'mrd_order_cash_to_get' => $cashToGet,
                         'mrd_order_status' => 'pending'
                     ]);
 
 
+                //GET ORDER ID
                 $orderId = DB::table('mrd_order')
                     ->where('mrd_order_menu_id', $menuId)
                     ->where('mrd_order_user_id', $userId)
@@ -99,22 +111,8 @@ class OrderController extends Controller
                     ->first();
 
 
-                //INSERT NOTIFICATION
-                $notificationController = app(NotificationController::class);
 
-                // Data to send
-                $notif_data = compact(
-                    'menuId',
-                    'date',
-                    'price',
-                    'orderId',
-                    'TFLoginToken',
-                    'switchValue',
-                    'quantity'
-                );
-
-                // Create and send the request
-                $result = $notificationController->notifOrderPlace(new Request($notif_data));
+                $NotifService->notifOrderPlace($userId, $menuId, $date, $totalPrice, $orderId,  $switchValue, $quantity);
 
 
                 // Return a response based on update result
@@ -134,28 +132,9 @@ class OrderController extends Controller
                 }
             } else {
 
-
-                //MARK: NEW ORDER
-
-                $userCredit = DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->value('mrd_user_credit');
-
-                $deliveryCommission = DB::table('mrd_setting')
-                    ->value('mrd_setting_commission_delivery');
-
-
-                //CALCULATE CASH TO GET for mrd_order table insert
-                $subtotal = $userCredit - ($price + $deliveryCommission);
-
-                if ($subtotal > 0) {
-                    $cash_to_get = 0;
-                } else {
-
-                    $cash_to_get = abs($subtotal);
-                }
-
-
+                //MARK: ORDER NEW 
+                $cash_to_get = $CreditService->cashToGet($userId, $quantity);
+                $totalPrice = $CreditService->totalPrice($userId, $quantity);
 
 
                 //MRD_ORDER INSERT DATA, NEW ORDER
@@ -164,8 +143,8 @@ class OrderController extends Controller
                     'mrd_order_menu_id' => $menuId,
                     'mrd_order_quantity' => $quantity,
                     'mrd_order_type' => $orderType,
-                    'mrd_order_mealbox' => $this->getUserMealboxById($userId),
-                    'mrd_order_total_price' => $price,
+                    'mrd_order_mealbox' => $MealboxService->extraMealbox($userId, $quantity),
+                    'mrd_order_total_price' => $totalPrice,
                     'mrd_order_cash_to_get' => $cash_to_get,
                     'mrd_order_date' => $date
                 ]);
@@ -181,29 +160,16 @@ class OrderController extends Controller
                     }
                 }
 
-                //INSERT NOTIFICATION
-                $notificationController = app(NotificationController::class);
 
-                // Data to send
-                $notif_data = compact(
-                    'menuId',
-                    'date',
-                    'price',
-                    'orderId',
-                    'TFLoginToken',
-                    'switchValue',
-                    'quantity'
-                );
-
-                // Create and send the request
-                $result = $notificationController->notifOrderPlace(new Request($notif_data));
-
+                $NotifService->notifOrderPlace($userId, $menuId, $date, $totalPrice, $orderId,  $switchValue, $quantity);
 
 
 
                 //MARK: JSON RES
                 return response()->json([
                     'success' => true,
+                    'totalPrice' => $totalPrice,
+                    'cash_to_get' => $cash_to_get,
                     'message' => 'Order inserted successfully',
                     'selectedFoods' => $selectedFoods,
                     'orderType' => $orderType,
@@ -212,6 +178,8 @@ class OrderController extends Controller
                 ]);
             }
         } else {
+
+            //MARK: ORDER CANCEL 
             $updatedRows = OrderMod::where(
                 'mrd_order_menu_id',
                 $menuId
@@ -228,23 +196,8 @@ class OrderController extends Controller
                 ->first();
 
 
-            //INSERT NOTIFICATION
-            $notificationController = app(NotificationController::class);
 
-            // Data to send
-            $notif_data = compact(
-                'menuId',
-                'date',
-                'price',
-                'orderId',
-                'TFLoginToken',
-                'switchValue',
-                'quantity'
-            );
-
-            // Create and send the request
-            $result = $notificationController->notifOrderPlace(new Request($notif_data));
-
+            $NotifService->notifOrderPlace($userId, $menuId, $date, $totalPrice, $orderId,  $switchValue, $quantity);
 
 
             return response()->json([
@@ -260,60 +213,44 @@ class OrderController extends Controller
     public function quantityChanger(Request $request)
     {
 
-        //$menuController = new MenuController();
         // Retrieve data from the request
         $menuId = $request->input('menuId');
         $date = $request->input('date');
         $TFLoginToken = $request->input('TFLoginToken');
-        $quantityValue = $request->input('quantityValue');
-        $totalPrice = $request->input('totalPrice');
+        $quantity = $request->input('quantityValue');
 
+        $CreditService = new CreditService();
+        $NotifService = new NotifService();
+        $OrderService = new OrderService();
+        $MealboxService = new MealboxService();
 
         // Fetch user ID based on session token
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
             ->value('mrd_user_id');
 
 
         if ($userId) {
 
+            $cash_to_get = $CreditService->cashToGet($userId, $quantity);
+            $totalPrice = $CreditService->totalPrice($userId, $quantity);
+            $extraBox = $MealboxService->extraMealbox($userId, $quantity);
 
-            $userCredit = DB::table('mrd_user')
-                ->where('mrd_user_id', $userId)
-                ->value('mrd_user_credit');
-
-
-            $deliveryCommission = DB::table('mrd_order')
-                ->where('mrd_order_menu_id', $menuId)
-                ->where('mrd_order_user_id', $userId)
-                ->where('mrd_order_date', $date)
-                ->value('mrd_order_deliv_commission');
-
-
-            $subtotal = $userCredit - ($totalPrice + $deliveryCommission);
-
-            if ($subtotal > 0) {
-                $cash_to_get = 0;
-            } else {
-
-                $cash_to_get = abs($subtotal);
-            }
-
-
-            //UPDATE ORDER WITH NEW QUANTITY
-            $updatedRows = DB::table('mrd_order')
+            //UPDATE ORDER WITH NEW QUANTITY & MEALBOX
+            DB::table('mrd_order')
                 ->where('mrd_order_menu_id', $menuId)
                 ->where('mrd_order_user_id', $userId)
                 ->where('mrd_order_date', $date)
                 ->update([
-                    'mrd_order_quantity' => $quantityValue,
+                    'mrd_order_quantity' => $quantity,
+                    'mrd_order_mealbox' =>  $extraBox,
                     'mrd_order_total_price' => $totalPrice,
                     'mrd_order_cash_to_get' => $cash_to_get
                 ]);
 
 
 
-
-
+            //GET ORDER ID
             $orderId = DB::table('mrd_order')
                 ->where('mrd_order_menu_id', $menuId)
                 ->where('mrd_order_user_id', $userId)
@@ -328,8 +265,8 @@ class OrderController extends Controller
                 ->orderBy('mrd_notif_date_added', 'desc') // Assuming you have a 'created_at' column for determining the most recent
                 ->limit(1)
                 ->update([
-                    'mrd_notif_quantity' => $quantityValue,
-                    'mrd_notif_total_price' => $totalPrice + $deliveryCommission,
+                    'mrd_notif_quantity' => $quantity,
+                    'mrd_notif_total_price' => $totalPrice,
                 ]);
 
 
@@ -340,7 +277,8 @@ class OrderController extends Controller
                 'success' => true,
                 'message' => 'Quantity has been changed',
                 'orderId' => $orderId,
-                //'data' => $menuId, $date, $TFLoginToken, $quantityValue
+                'extraBox' => $extraBox,
+                //'data' => $menuId, $date, $TFLoginToken, $quantity
 
 
             ]);
@@ -353,23 +291,6 @@ class OrderController extends Controller
         // Execute the query to fetch the mrd_user_mealbox value
         $mealboxValue = DB::table('mrd_user')
             ->where('mrd_user_id', $id)
-            ->value('mrd_user_mealbox');
-
-        return $mealboxValue;
-    }
-
-    //MARK: Mbox Stat API
-    public function mealboxStatApi(Request $request)
-    {
-
-        $TFLoginToken = $request->input('TFLoginToken');
-
-        // Fetch user ID based on session token
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)
-            ->value('mrd_user_id');
-        // Execute the query to fetch the mrd_user_mealbox value
-        $mealboxValue = DB::table('mrd_user')
-            ->where('mrd_user_id', $userId)
             ->value('mrd_user_mealbox');
 
         return $mealboxValue;

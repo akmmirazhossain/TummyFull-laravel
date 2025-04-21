@@ -19,7 +19,9 @@ class DeliveryController extends Controller
         // Get the token from the Authorization header
         $authorizationHeader = $request->header('Authorization');
         $TFLoginToken = str_replace('Bearer ', '', $authorizationHeader); // Remove 'Bearer ' from the token
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
 
         // Get the current date
         $today = Carbon::now()->format('Y-m-d');
@@ -165,10 +167,10 @@ class DeliveryController extends Controller
             ->where('mrd_order_id', $orderId)
             ->value('mrd_order_deliv_commission');
 
-        $orderDelivPrice =  $orderTotalPrice + $deliveryCommission;
+        $orderDelivPrice =  $orderTotalPrice;
 
 
-
+        //MARK: DELIVERED
         if ($delivStatus == 'delivered') {
             $notif_message =  "Your " . $menuPeriod . " has been successfully delivered.";
             $notif_credit_calc = null;
@@ -251,7 +253,7 @@ class DeliveryController extends Controller
 
 
             //MARK: MEALBOX
-            //Increment the number of mealboxes the customer has
+
 
             //GET USER INFO
             $user = DB::table('mrd_user')->where('mrd_user_id', $userId)->first();
@@ -269,43 +271,43 @@ class DeliveryController extends Controller
 
 
             // Decrease the number of mealboxes based on how many are returned
-            if ($mboxPick > 0 && $user->mrd_user_has_mealbox >= $mboxPick) {
+            // if ($mboxPick > 0 && $user->mrd_user_has_mealbox >= $mboxPick) {
 
-                DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->decrement('mrd_user_has_mealbox', $mboxPick);
+            //     DB::table('mrd_user')
+            //         ->where('mrd_user_id', $userId)
+            //         ->decrement('mrd_user_has_mealbox', $mboxPick);
 
-                // Increase credit by 10 or 20 depending on mboxPick
-                $creditToAdd = $mboxPick * 10;
+            //     // Increase credit by 10 or 20 depending on mboxPick
+            //     $creditToAdd = $mboxPick * 10;
 
-                DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->increment('mrd_user_credit', $creditToAdd);
-
-
-                // Insert discount record in mrd_payment
-                DB::table('mrd_payment')->insert([
-                    'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
-                    'mrd_payment_amount' => $creditToAdd,
-                    'mrd_payment_user_id' => $userId,
-                    'mrd_payment_order_id' => $orderId,
-                    'mrd_payment_for' => 'mealbox', // Since it's for meal orders
-                    'mrd_payment_method' => 'system', // Since the system is applying the discount
-                    'mrd_payment_type' => 'cashback', // Marked as discount
-                    'mrd_payment_date_paid' => now(), // Timestamp of the discount application
-                ]);
+            //     DB::table('mrd_user')
+            //         ->where('mrd_user_id', $userId)
+            //         ->increment('mrd_user_credit', $creditToAdd);
 
 
-                $mrd_notif_message = "You’ve received ৳" . $creditToAdd . " cashback for returning your mealbox.";
-                // Insert notification for the user
-                DB::table('mrd_notification')->insert([
-                    'mrd_notif_user_id' => $userId,
-                    'mrd_notif_order_id' => $orderId,
-                    'mrd_notif_message' => $mrd_notif_message,
-                    'mrd_notif_type' => 'cashback',
-                    'mrd_notif_date_added' => now(),
-                ]);
-            }
+            //     // Insert discount record in mrd_payment
+            //     DB::table('mrd_payment')->insert([
+            //         'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
+            //         'mrd_payment_amount' => $creditToAdd,
+            //         'mrd_payment_user_id' => $userId,
+            //         'mrd_payment_order_id' => $orderId,
+            //         'mrd_payment_for' => 'mealbox', // Since it's for meal orders
+            //         'mrd_payment_method' => 'system', // Since the system is applying the discount
+            //         'mrd_payment_type' => 'cashback', // Marked as discount
+            //         'mrd_payment_date_paid' => now(), // Timestamp of the discount application
+            //     ]);
+
+
+            //     $mrd_notif_message = "You’ve received ৳" . $creditToAdd . " cashback for returning your mealbox.";
+            //     // Insert notification for the user
+            //     DB::table('mrd_notification')->insert([
+            //         'mrd_notif_user_id' => $userId,
+            //         'mrd_notif_order_id' => $orderId,
+            //         'mrd_notif_message' => $mrd_notif_message,
+            //         'mrd_notif_type' => 'cashback',
+            //         'mrd_notif_date_added' => now(),
+            //     ]);
+            // }
 
 
 
@@ -382,6 +384,7 @@ class DeliveryController extends Controller
                     ->update(['mrd_order_cash_to_get' => $cash_to_get]);
             }
         }
+        //DELIVERED END
         //elseif (
         //     $delivStatus == 'delivered_with_due'
         // ) {

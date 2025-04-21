@@ -3,6 +3,14 @@
 use Illuminate\Support\Facades\Route;
 
 
+
+//TESTING ROUTES
+use App\Http\Controllers\TesterController;
+
+Route::get('/testy-dalbhath', [TesterController::class, 'testyDalbhath']);
+
+
+
 //AUTH CHECKERS
 use App\Http\Controllers\Web\AuthController;
 

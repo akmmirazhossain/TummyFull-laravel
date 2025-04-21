@@ -130,7 +130,9 @@ class ChefController extends Controller
 
 
     //     $TFLoginToken = $request->query('TFLoginToken');
-    //     $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+    //    $userId = DB::table('mrd_user')
+    //         ->where('mrd_user_session_token', $TFLoginToken)
+    //         ->value('mrd_user_id');
 
 
 
@@ -266,7 +268,9 @@ class ChefController extends Controller
     {
 
         $TFLoginToken = $request->query('TFLoginToken');
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
 
 
 
@@ -294,7 +298,9 @@ class ChefController extends Controller
     {
 
         $TFLoginToken = $request->query('TFLoginToken');
-        $userId = \App\Models\User::where('mrd_user_session_token', $TFLoginToken)->value('mrd_user_id');
+        $userId = DB::table('mrd_user')
+            ->where('mrd_user_session_token', $TFLoginToken)
+            ->value('mrd_user_id');
 
 
 
