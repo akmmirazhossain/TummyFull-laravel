@@ -21,7 +21,7 @@ class NotificationController extends Controller
             ->where('mrd_user_session_token', $TFLoginToken)
             ->value('mrd_user_id');
 
-        $notifications = DB::select("SELECT mrd_notif_message,mrd_notif_date_added,mrd_notif_quantity,mrd_notif_total_price,mrd_notif_seen,mrd_notif_type FROM mrd_notification WHERE mrd_notif_user_id = $userId ORDER BY mrd_notif_id DESC LIMIT 100");
+        $notifications = DB::select("SELECT mrd_notif_message,mrd_notif_date_added,mrd_notif_quantity,mrd_notif_mealbox_extra,mrd_notif_total_price,mrd_notif_seen,mrd_notif_type FROM mrd_notification WHERE mrd_notif_user_id = $userId ORDER BY mrd_notif_id DESC LIMIT 100");
 
         return response()->json([
 

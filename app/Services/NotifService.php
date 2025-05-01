@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 
-
+use App\Services\MealboxService;
 
 class NotifService
 {
@@ -22,16 +22,18 @@ class NotifService
             ->where('mrd_menu_id', $menuId)
             ->value('mrd_menu_period');
 
+        $MealboxService = new MealboxService();
 
 
-        $formattedDate = Carbon::parse($date)->format('F j (l)');
+
+        $formattedDate = Carbon::parse($date)->format('M j (D)');
 
 
 
         if ($switchValue == 1) {
-            $notif_message =  "Ordered " . $menuPeriod . " of " . $formattedDate;
+            $notif_message =  "Ordered " . $menuPeriod . ", " . $formattedDate;
         } else {
-            $notif_message =  "Canceled " . $menuPeriod . " of " . $formattedDate;
+            $notif_message =  "Canceled " . $menuPeriod . ", " . $formattedDate;
         }
 
 
@@ -42,6 +44,7 @@ class NotifService
             $optionalFields = [
                 'mrd_notif_total_price' => $totalPrice,
                 'mrd_notif_quantity' => $quantity,
+                'mrd_notif_mealbox_extra' => $MealboxService->mealboxExtra($userId, $quantity),
             ];
         }
 
@@ -81,7 +84,7 @@ class NotifService
             if ($mealboxIfPaid == 1) {
                 $notif_message =  "Mealbox reactivated.";
             } else {
-                $notif_message =  "Mealbox activated for Tk " . $mealBoxPrice . ". Your upcoming meals will be delivered in a mealbox.";
+                $notif_message =  "Mealbox activated for Tk " . $mealBoxPrice . ".";
             }
         } else {
 
@@ -99,5 +102,80 @@ class NotifService
             'mrd_notif_message' => $notif_message,
             'mrd_notif_type' => 'mealbox'
         ]);
+    }
+
+    public static function notifInsert(
+        $userId,
+        $orderId,
+        $message,
+        $type,
+        $action,
+        $quantity,
+        $mboxExtra,
+        $totalPrice,
+        $seen,
+
+    ) {
+        return DB::table('mrd_notification')->insert([
+            'mrd_notif_user_id'     => $userId,
+            'mrd_notif_order_id'    => $orderId,
+            'mrd_notif_message'     => $message,
+            'mrd_notif_type'        => $type,
+            'mrd_notif_action'        => $action,
+            'mrd_notif_quantity'    => $quantity,
+            'mrd_notif_mealbox_extra'     => $mboxExtra,
+            'mrd_notif_total_price' => $totalPrice,
+            'mrd_notif_seen' => $seen,
+        ]);
+    }
+
+
+    // MARK: Notification Update
+    public static function notifUpdate(
+        $userId,
+        $orderId,
+        $message = null,
+        $type,
+        $action,
+        $quantity = null,
+        $mboxExtra = null,
+        $totalPrice = null,
+        $seen = null
+    ) {
+        $updateData = [];
+
+        if (!is_null($message)) {
+            $updateData['mrd_notif_message'] = $message;
+        }
+
+        if (!is_null($quantity)) {
+            $updateData['mrd_notif_quantity'] = $quantity;
+        }
+
+        if (!is_null($mboxExtra)) {
+            $updateData['mrd_notif_mealbox_extra'] = $mboxExtra;
+        }
+
+        if (!is_null($totalPrice)) {
+            $updateData['mrd_notif_total_price'] = $totalPrice;
+        }
+
+        if (!is_null($seen)) {
+            $updateData['mrd_notif_seen'] = $seen;
+        }
+
+        if (!is_null($action)) {
+            $updateData['mrd_notif_action'] = $action;
+        }
+
+        if (empty($updateData)) {
+            return false; // or throw an exception
+        }
+
+        return DB::table('mrd_notification')
+            ->where('mrd_notif_user_id', $userId)
+            ->where('mrd_notif_order_id', $orderId)
+            ->where('mrd_notif_type', $type)
+            ->update($updateData);
     }
 }

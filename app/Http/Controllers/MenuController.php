@@ -203,7 +203,7 @@ class MenuController extends Controller
                             $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
 
-                            $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                            $mealboxStatus = $mealboxService->mealboxOrderStatus($userId, $menu->mrd_menu_id, $date);
                             $foodData['mealbox'] = $mealboxStatus;
                             $dayData['lunch'] = $foodData;
                         }
@@ -221,7 +221,7 @@ class MenuController extends Controller
                             // Get the quantity for lunch and add it to food data
                             $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                             $foodData['quantity'] = $quantity;
-                            $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                            $mealboxStatus = $mealboxService->mealboxOrderStatus($userId, $menu->mrd_menu_id, $date);
                             $foodData['mealbox'] = $mealboxStatus;
                             $dayData['lunch'] = $foodData;
                         }
@@ -242,7 +242,7 @@ class MenuController extends Controller
                         // Get the quantity for lunch and add it to food data
                         $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                         $foodData['quantity'] = $quantity;
-                        $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                        $mealboxStatus = $mealboxService->mealboxOrderStatus($userId, $menu->mrd_menu_id, $date);
                         $foodData['mealbox'] = $mealboxStatus;
                         $dayData['lunch'] = $foodData;
                     }
@@ -259,7 +259,7 @@ class MenuController extends Controller
                     // Get the quantity for dinner and add it to food data
                     $quantity = $orderService->getQuantity($userId, $menu->mrd_menu_id, $date);
                     $foodData['quantity'] = $quantity;
-                    $mealboxStatus = $mealboxService->getMealboxStatus($userId, $menu->mrd_menu_id, $date);
+                    $mealboxStatus = $mealboxService->mealboxOrderStatus($userId, $menu->mrd_menu_id, $date);
                     $foodData['mealbox'] = $mealboxStatus;
                     $dayData['dinner'] = $foodData;
                 }

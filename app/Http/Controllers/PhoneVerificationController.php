@@ -4,6 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\SmsController;
 
+use App\Services\CreditService;
+use App\Services\MealboxService;
+use App\Services\NotifService;
+use App\Services\PaymentService;
+use App\Services\SettingsService;
+use App\Services\OrderService;
 
 
 use Illuminate\Http\Request;
@@ -85,16 +91,22 @@ class PhoneVerificationController extends Controller
 
 
                 // Insert discount record in mrd_payment
-                DB::table('mrd_payment')->insert([
-                    'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
-                    'mrd_payment_amount' => intval($bonus),
-                    'mrd_payment_user_id' => $userId,
-                    'mrd_payment_for' => 'wallet', // Since it's for meal orders
-                    'mrd_payment_method' => 'system', // Since the system is applying the discount
-                    'mrd_payment_type' => 'discount', // Marked as discount
-                    'mrd_payment_message' => 'Reg Discount',
-                    'mrd_payment_date_paid' => now(), // Timestamp of the discount application
-                ]);
+
+
+                PaymentService::paymentInsert(
+                    $userId,
+                    null,
+                    intval($bonus),
+                    'registration',
+                    'paid',
+                    'discount',
+                    null,
+                    'system',
+                    null,
+                    null,
+                    null,
+                    now()
+                );
             }
 
 

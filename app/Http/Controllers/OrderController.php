@@ -73,6 +73,9 @@ class OrderController extends Controller
             return ResponseService::error('Unable to retrieve user ID');
         }
 
+        //GET ORDER ID
+        $orderId = $this->getOrderId($userId, $menuId,  $date);
+
 
 
 
@@ -86,49 +89,34 @@ class OrderController extends Controller
 
                 //IF THE ORDER EXISTS THEN PERFROM THESE FUNCTIONS
 
-                $cashToGet = $CreditService->cashToGet($userId, $quantity);
-
-                //UPDATE ORDER IF ORDER EXISTS
-                $updatedRows = DB::table('mrd_order')
-                    ->where('mrd_order_menu_id', $menuId)
-                    ->where('mrd_order_user_id', $userId)
-                    ->where('mrd_order_date', $date)
-                    ->update([
-                        'mrd_order_total_price' => $pricePerMeal,
-                        'mrd_order_mealbox' => $MealboxService->extraMealbox($userId, $quantity),
-                        'mrd_order_quantity' => $quantity,
-                        'mrd_order_cash_to_get' => $cashToGet,
-                        'mrd_order_status' => 'pending'
-                    ]);
-
-
-                //GET ORDER ID
-                $orderId = DB::table('mrd_order')
-                    ->where('mrd_order_menu_id', $menuId)
-                    ->where('mrd_order_user_id', $userId)
-                    ->where('mrd_order_date', $date)
-                    ->pluck('mrd_order_id')
-                    ->first();
+                $updatedRows = OrderService::orderUpdate(
+                    $userId,
+                    $menuId,
+                    $date,
+                    null,              // $orderFor
+                    $orderType,
+                    $quantity,
+                    'pending',         // $orderStatus
+                    null,              // $orderPayStatus
+                    null,              // $orderRating
+                    null,              // $orderFeedback
+                    $MealboxService,
+                    $CreditService
+                );
 
 
 
                 $NotifService->notifOrderPlace($userId, $menuId, $date, $totalPrice, $orderId,  $switchValue, $quantity);
 
 
-                // Return a response based on update result
+
                 if ($updatedRows > 0) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Order updated successfully',
+                    return ResponseService::success('Order updated successfully', [
                         'updatedRows' => $updatedRows,
                         'orderId' => $orderId
-
                     ]);
                 } else {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'No matching order found to update'
-                    ]);
+                    return ResponseService::error('No matching order found to update');
                 }
             } else {
 
@@ -137,17 +125,23 @@ class OrderController extends Controller
                 $totalPrice = $CreditService->totalPrice($userId, $quantity);
 
 
+
+
                 //MRD_ORDER INSERT DATA, NEW ORDER
-                $orderId = DB::table('mrd_order')->insertGetId([
-                    'mrd_order_user_id' => $userId,
-                    'mrd_order_menu_id' => $menuId,
-                    'mrd_order_quantity' => $quantity,
-                    'mrd_order_type' => $orderType,
-                    'mrd_order_mealbox' => $MealboxService->extraMealbox($userId, $quantity),
-                    'mrd_order_total_price' => $totalPrice,
-                    'mrd_order_cash_to_get' => $cash_to_get,
-                    'mrd_order_date' => $date
-                ]);
+                $orderId = OrderService::orderInsert(
+                    $userId,
+                    $menuId,
+                    $date,
+                    null,              // $orderFor
+                    $orderType,
+                    $quantity,
+                    'pending',         // $orderStatus
+                    null,              // $orderPayStatus
+                    null,              // $orderRating
+                    null,              // $orderFeedback
+                    $MealboxService,
+                    $CreditService
+                );
 
                 //if order type custom
                 if ($orderType === 'custom' && is_array($selectedFoods)) {
@@ -166,34 +160,43 @@ class OrderController extends Controller
 
 
                 //MARK: JSON RES
-                return response()->json([
-                    'success' => true,
-                    'totalPrice' => $totalPrice,
-                    'cash_to_get' => $cash_to_get,
-                    'message' => 'Order inserted successfully',
-                    'selectedFoods' => $selectedFoods,
-                    'orderType' => $orderType,
-                    'orderId' => $orderId
-
+                return ResponseService::success('Order inserted successfully', [
+                    'totalPrice'     => $totalPrice,
+                    'cash_to_get'    => $cash_to_get,
+                    'selectedFoods'  => $selectedFoods,
+                    'orderType'      => $orderType,
+                    'orderId'        => $orderId
                 ]);
             }
         } else {
 
             //MARK: ORDER CANCEL 
-            $updatedRows = OrderMod::where(
-                'mrd_order_menu_id',
-                $menuId
-            )
-                ->where('mrd_order_user_id', $userId)
-                ->where('mrd_order_date', $date)
-                ->update(['mrd_order_status' => 'cancelled']);
+            // $updatedRows = OrderMod::where(
+            //     'mrd_order_menu_id',
+            //     $menuId
+            // )
+            //     ->where('mrd_order_user_id', $userId)
+            //     ->where('mrd_order_date', $date)
+            //     ->update(['mrd_order_status' => 'cancelled']);
 
-            $orderId = DB::table('mrd_order')
-                ->where('mrd_order_menu_id', $menuId)
-                ->where('mrd_order_user_id', $userId)
-                ->where('mrd_order_date', $date)
-                ->pluck('mrd_order_id')
-                ->first();
+
+            $updatedRows = OrderService::orderUpdate(
+                $userId,
+                $menuId,
+                $date,
+                null,              // $orderFor
+                $orderType,
+                $quantity,
+                'cancelled',         // $orderStatus
+                null,              // $orderPayStatus
+                null,              // $orderRating
+                null,              // $orderFeedback
+                $MealboxService,
+                $CreditService
+            );
+
+
+
 
 
 
@@ -234,7 +237,8 @@ class OrderController extends Controller
 
             $cash_to_get = $CreditService->cashToGet($userId, $quantity);
             $totalPrice = $CreditService->totalPrice($userId, $quantity);
-            $extraBox = $MealboxService->extraMealbox($userId, $quantity);
+
+            $orderId = $this->getOrderId($userId, $menuId,  $date);
 
             //UPDATE ORDER WITH NEW QUANTITY & MEALBOX
             DB::table('mrd_order')
@@ -243,20 +247,13 @@ class OrderController extends Controller
                 ->where('mrd_order_date', $date)
                 ->update([
                     'mrd_order_quantity' => $quantity,
-                    'mrd_order_mealbox' =>  $extraBox,
+                    'mrd_order_mealbox' =>  $MealboxService->mealboxGive($userId,  $quantity),
+                    'mrd_order_mealbox_extra' => $MealboxService->mealboxExtra($userId, $quantity),
                     'mrd_order_total_price' => $totalPrice,
                     'mrd_order_cash_to_get' => $cash_to_get
                 ]);
 
 
-
-            //GET ORDER ID
-            $orderId = DB::table('mrd_order')
-                ->where('mrd_order_menu_id', $menuId)
-                ->where('mrd_order_user_id', $userId)
-                ->where('mrd_order_date', $date)
-                ->pluck('mrd_order_id')
-                ->first();
 
 
             // NOTIFCATION UPDATE FOR QUANTITY
@@ -267,6 +264,7 @@ class OrderController extends Controller
                 ->update([
                     'mrd_notif_quantity' => $quantity,
                     'mrd_notif_total_price' => $totalPrice,
+                    'mrd_notif_mealbox_extra' => $MealboxService->mealboxExtra($userId, $quantity),
                 ]);
 
 
@@ -277,7 +275,7 @@ class OrderController extends Controller
                 'success' => true,
                 'message' => 'Quantity has been changed',
                 'orderId' => $orderId,
-                'extraBox' => $extraBox,
+
                 //'data' => $menuId, $date, $TFLoginToken, $quantity
 
 
@@ -294,5 +292,16 @@ class OrderController extends Controller
             ->value('mrd_user_mealbox');
 
         return $mealboxValue;
+    }
+
+
+    //MARK: GET ORDER ID
+    public function getOrderId($userId, $menuId,  $date)
+    {
+        return DB::table('mrd_order')
+            ->where('mrd_order_menu_id', $menuId)
+            ->where('mrd_order_user_id', $userId)
+            ->where('mrd_order_date', $date)
+            ->value('mrd_order_id');
     }
 }

@@ -62,7 +62,8 @@ class SettingController extends Controller
             $mrdSetting->mrd_setting_delivery_time_lunch,
             "delivery_time_dinner" =>
             $mrdSetting->mrd_setting_delivery_time_dinner,
-
+            "mrd_setting_mealbox_enforce_limit" =>
+            $mrdSetting->mrd_setting_mealbox_enforce_limit,
             // "quantity_min" => $mrdSetting->mrd_setting_quantity_min,
             // "quantity_max" => $mrdSetting->mrd_setting_quantity_max,
             "server_time" => $serverTime,

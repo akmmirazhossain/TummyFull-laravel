@@ -57,27 +57,12 @@ class CreditService
         return $totalPrice;
     }
 
-    // // Stub for extraMealbox logic
-    // private function extraMealbox($userId, $quantity)
-    // {
-    //     $userId = '';
-    //     $orderId = '';
-    //     $quantity = '';
-    //     $mealPrice = ''; //Per meal price
-    //     $deliveryComm = '';
+    public static function userCredit($userId)
+    {
+        $userCredit = DB::table('mrd_user')
+            ->where('mrd_user_id', $userId)
+            ->value('mrd_user_credit');
 
-
-    //     $mealboxIsActive = '';
-    //     $mealboxPrice = '';
-    //     $mealboxHasNow = '';
-    //     $mealboxHasAfter = '';
-    //     $mealboxExtra = '';
-    //     $mealboxGive = '';
-    //     $mealboxPick = '';
-    //     $mealboxReturn = '';
-
-
-
-    //     $totalPrice = '';
-    // }
+        return $userCredit;
+    }
 }

@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
+use App\Services\CreditService;
+use App\Services\MealboxService;
+use App\Services\NotifService;
+use App\Services\PaymentService;
+use App\Services\SettingsService;
+use App\Services\OrderService;
+
 class DeliveryController extends Controller
 {
     //MARK: deliveryList
@@ -137,12 +144,14 @@ class DeliveryController extends Controller
         // $giveMealbox = $request->input('giveMealbox');
         $mealboxPaid = $request->input('mealboxPaid');
         $delivStatus = $request->input('delivStatus');
-        $mboxPick = $request->input('mboxPick');
+        $mealboxPicked = $request->input('mboxPick');
+        $date = $request->input('date');
 
 
         // $mealPeriod = $request->input('mealType');
 
-
+        $MealboxService = new MealboxService();
+        $CreditService = new CreditService();
 
 
         $userCredit = DB::table('mrd_user')
@@ -163,64 +172,157 @@ class DeliveryController extends Controller
             ->value('mrd_order_quantity');
 
 
+        $perMealPrice = DB::table('mrd_setting')
+            ->select('mrd_setting_meal_price')
+            ->first();
+
         $deliveryCommission = DB::table('mrd_order')
             ->where('mrd_order_id', $orderId)
             ->value('mrd_order_deliv_commission');
 
+        $orderDate = DB::table('mrd_order')
+            ->where('mrd_order_id', $orderId)
+            ->value('mrd_order_date');
+
         $orderDelivPrice =  $orderTotalPrice;
 
+        $formattedDate = Carbon::parse($orderDate)->format('M j (D)');
 
         //MARK: DELIVERED
         if ($delivStatus == 'delivered') {
-            $notif_message =  "Your " . $menuPeriod . " has been successfully delivered.";
-            $notif_credit_calc = null;
+            $notifMessage =   'Delivered ' . $menuPeriod . ', ' . $formattedDate;
 
 
-            //NOTIFICATION INSERT ON DELIVERY STATUS
-            $notifInsert = DB::table('mrd_notification')->insert([
-                'mrd_notif_user_id' =>
-                $userId,
-                'mrd_notif_message' => $notif_message,
-                'mrd_notif_quantity' => $quantity,
-                'mrd_notif_total_price' => $orderDelivPrice,
-                'mrd_notif_type' => 'delivery'
-            ]);
+            $mealboxExtra = $MealboxService->mealboxExtra($userId, $quantity);
 
+            NotifService::notifInsert($userId, $orderId, $notifMessage, 'order', 'delivery', $quantity, $mealboxExtra, $orderDelivPrice,  '0');
+
+
+            //MARK: MEALBOX
+            $user = DB::table('mrd_user')->where('mrd_user_id', $userId)->first();
+
+            //PAY EXTRA MEALBOX PRICE
+            if ($user->mrd_user_mealbox) {
+                $mealboxExtra = $MealboxService->mealboxExtra($userId,  $quantity);
+                $mealboxExtraPrice = $MealboxService->mealboxExtraPrice($mealboxExtra);
+
+                //PAYMENT INSERT FOR MEALBOX IF EXTRA MEALBOX PRICE IS NOT 0
+                if ($mealboxExtraPrice) {
+                    $paymentId = PaymentService::paymentInsert(
+                        $userId,
+                        $orderId,
+                        $mealboxExtraPrice,
+                        'mealbox',
+                        'paid',
+                        'payment',
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    );
+                }
+            } else {
+                $mealboxExtraPrice = 0;
+            }
 
             //COMPARE USER CREDIT WITH PRICE
             if ($userCredit >= $orderDelivPrice) {
-                $userCreditNew = $userCredit - $orderDelivPrice;
-                //NOTIF INSERT
-                $notifInsert = DB::table('mrd_notification')->insert([
-                    'mrd_notif_user_id' =>
-                    $userId,
-                    'mrd_notif_message' => '৳' . $orderDelivPrice . ' has been paid from your wallet. New credit: ' . $userCredit . ' - ' . $orderDelivPrice . ' = ৳' . $userCreditNew,
 
-                    'mrd_notif_total_price' => $notif_credit_calc,
-                    'mrd_notif_type' => 'order'
-                ]);
+                //PURPOSE: If credit is MORE than TotalPrice, then pay entirely from wallet. 
+                $userCreditNew = $userCredit - $orderDelivPrice;
+                // $mealboxExtra = $MealboxService->mealboxExtra($userId, $quantity);
+                $notifMessage = 'Paid ৳' . $orderDelivPrice . ' from wallet. New credit: ৳' . $userCredit . ' - ৳' . $orderDelivPrice . ' = ৳' . $userCreditNew . '.';
+
+
+                //NOTIF INSERT
+                NotifService::notifInsert($userId, $orderId, $notifMessage, 'wallet', 'payment', null, null, null,  '0');
+
+                //PAYMENT INSERT WALLET ONLY
+                PaymentService::paymentInsert(
+                    $userId,
+                    $orderId,
+                    $orderDelivPrice - $mealboxExtraPrice - $deliveryCommission,
+                    'order',
+                    'paid',
+                    'payment',
+                    null,
+                    'wallet',
+                    null,
+                    null,
+                    null,
+                    null
+                );
 
                 $paymentMethod = 'wallet';
             } else {
+                //PURPOSE: If credit is LESS than TotalPrice, then pay entirely from wallet or cash. 
                 $userCreditNew = 0;
                 $paymentMethod = 'cod';
                 $cashToCollect = $orderDelivPrice - $userCredit;
 
                 if (($userCredit != 0) && ($userCredit <= $orderDelivPrice)) {
-                    $notif_message =  '৳' . $userCredit . ' has been paid from wallet & ৳' . $cashToCollect . ' via cash on delivery. New credit: ৳' . $userCreditNew;
-                } else {
+                    //PURPOSE: If credit is more than TotalPrice, then pay from wallet and cash combined. 
+                    $notifMessage =  'Paid ৳' . $userCredit . ' from wallet + ৳' . $cashToCollect . ' via cash. New credit: ৳' . $userCreditNew;
 
-                    $notif_message =  '৳' . $orderDelivPrice . ' has been paid via cash on delivery.';
+
+                    $totalPrice = ($userCredit + $cashToCollect) - ($mealboxExtraPrice + $deliveryCommission);
+
+                    // Payment from wallet
+                    PaymentService::paymentInsert(
+                        $userId,
+                        $orderId,
+                        $userCredit,
+                        'order',
+                        'paid',
+                        'payment',
+                        null,
+                        'wallet',
+                        null,
+                        null,
+                        null,
+                        null
+                    );
+
+                    // Payment from cash
+                    PaymentService::paymentInsert(
+                        $userId,
+                        $orderId,
+                        $totalPrice,
+                        'order',
+                        'paid',
+                        'payment',
+                        null,
+                        'cod',
+                        null,
+                        null,
+                        null,
+                        null
+                    );
+                } else {
+                    //PURPOSE: If no credit, then pay entirely with cash. 
+                    $notifMessage =  'Paid ৳' . $orderDelivPrice . ' via cash';
+
+                    //PAYMENT INSERT CASH ON DELIV
+                    PaymentService::paymentInsert(
+                        $userId,
+                        $orderId,
+                        $orderDelivPrice - $mealboxExtraPrice - $deliveryCommission,
+                        'order',
+                        'paid',
+                        'payment',
+                        null,
+                        'cod',
+                        null,
+                        null,
+                        null,
+                        null
+                    );
                 }
 
-                $notifInsert = DB::table('mrd_notification')->insert([
-                    'mrd_notif_user_id' =>
-                    $userId,
-                    'mrd_notif_message' => $notif_message,
 
-                    'mrd_notif_total_price' => $notif_credit_calc,
-                    'mrd_notif_type' => 'order'
-                ]);
+                NotifService::notifInsert($userId, $orderId, $notifMessage, 'wallet', 'payment', null, null, null,  '0');
             }
 
             //UPDATE WALLET AFTER ORDER PRICE CUT
@@ -228,18 +330,41 @@ class DeliveryController extends Controller
                 ->where('mrd_user_id', $userId)
                 ->update(['mrd_user_credit' => $userCreditNew]);
 
-            //PAYMENT INSERT FOR ORDER
-            $paymentInsert = DB::table('mrd_payment')->insert([
-                'mrd_payment_status' =>
-                'paid',
-                'mrd_payment_amount' =>
-                $orderDelivPrice,
-                'mrd_payment_user_id' => $userId,
 
-                'mrd_payment_order_id' => $orderId,
-                'mrd_payment_for' => 'order',
-                'mrd_payment_method' => $paymentMethod
-            ]);
+
+            // //PAYMENT INSERT FOR FOOD ONLY
+            // PaymentService::paymentInsert(
+            //     $userId,
+            //     null,
+            //     $perMealPrice->mrd_setting_meal_price * $quantity,
+            //     'order',
+            //     'paid',
+            //     'payment',
+            //     null,
+            //     $paymentMethod,
+            //     null,
+            //     null,
+            //     null,
+            //     null
+            // );
+
+            //PAYMENT INSERT FOR DELIVERY CHARGE ONLY
+            PaymentService::paymentInsert(
+                $userId,
+                $orderId,
+                $deliveryCommission,
+                'delivery',
+                'paid',
+                'payment',
+                null,
+                $paymentMethod,
+                null,
+                null,
+                null,
+                null
+            );
+
+
 
 
             //ORDER DELIV STATUS UPDATE
@@ -252,21 +377,30 @@ class DeliveryController extends Controller
 
 
 
-            //MARK: MEALBOX
+
 
 
             //GET USER INFO
-            $user = DB::table('mrd_user')->where('mrd_user_id', $userId)->first();
 
 
-            //INCREMENT MEALBOX COUNT IF USER MEALBOX IS ACTIVATED AND HAS LESS THAN 2
-            if ($user->mrd_user_mealbox == 1 && $user->mrd_user_has_mealbox < 2) {
 
-                DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->increment('mrd_user_has_mealbox');
-            } else {
-                // Optional: Handle cases where they already have 2 mealboxes or mealbox system is not activated
+            //INCREMENT/DECREASE MEALBOX COUNT IF USER MEALBOX IS ACTIVATED
+            $MealboxService->mealboxHasUpdate($userId, $orderId, $mealboxPicked);
+
+
+
+            //MARK: order delivery increment by 1. 
+            DB::table('mrd_user')
+                ->where('mrd_user_id', $userId)
+                ->increment('mrd_user_order_delivered');
+
+
+
+
+
+
+            if ($mealboxPicked) {
+                $MealboxService->mealboxCashback($userId, $mealboxPicked);
             }
 
 
@@ -285,17 +419,7 @@ class DeliveryController extends Controller
             //         ->increment('mrd_user_credit', $creditToAdd);
 
 
-            //     // Insert discount record in mrd_payment
-            //     DB::table('mrd_payment')->insert([
-            //         'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
-            //         'mrd_payment_amount' => $creditToAdd,
-            //         'mrd_payment_user_id' => $userId,
-            //         'mrd_payment_order_id' => $orderId,
-            //         'mrd_payment_for' => 'mealbox', // Since it's for meal orders
-            //         'mrd_payment_method' => 'system', // Since the system is applying the discount
-            //         'mrd_payment_type' => 'cashback', // Marked as discount
-            //         'mrd_payment_date_paid' => now(), // Timestamp of the discount application
-            //     ]);
+
 
 
             //     $mrd_notif_message = "You’ve received ৳" . $creditToAdd . " cashback for returning your mealbox.";
@@ -312,38 +436,8 @@ class DeliveryController extends Controller
 
 
 
-            //IF THE USER HAS PAID FOR THE MEALBOX UPDATE/INSERT 
-            if ($user->mrd_user_mealbox == 1 && $user->mrd_user_mealbox_paid == 0) {
-
-                //GET MEALBOX PRICE
-                $mealboxPrice = DB::table('mrd_setting')
-                    ->value('mrd_setting_mealbox_price');
-                //MARK MEALBOX PAID IF IT IS UNPAID = 0
-                $hasMealboxUpdate = DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->update([
-                        'mrd_user_mealbox_paid' => '1'
-                    ]);
 
 
-
-                //PAYMENT INSERT FOR MEALBOX
-                $paymentInsert = DB::table('mrd_payment')->insert([
-                    'mrd_payment_status' =>
-                    'paid',
-                    'mrd_payment_amount' =>
-                    $mealboxPrice,
-                    'mrd_payment_user_id' => $userId,
-                    'mrd_payment_for' => 'mealbox',
-                    'mrd_payment_method' => 'cod'
-                ]);
-            }
-
-
-            //MARK: order delivery increment by 1. 
-            DB::table('mrd_user')
-                ->where('mrd_user_id', $userId)
-                ->increment('mrd_user_order_delivered');
 
 
 
@@ -352,7 +446,7 @@ class DeliveryController extends Controller
                 ->where('mrd_order_user_id', $userId)
                 ->where('mrd_order_status', 'pending')
                 ->orderBy('mrd_order_date', 'asc')
-                ->select('mrd_order_id', 'mrd_order_total_price')
+                ->select('mrd_order_id', 'mrd_order_user_id', 'mrd_order_quantity', 'mrd_order_total_price', 'mrd_order_deliv_commission')
                 ->first();
 
             //UPDATE CASH TO GET IF USER HAS A NEXT ORDER
@@ -360,28 +454,69 @@ class DeliveryController extends Controller
                 $nextOrder
             ) {
 
-                $nextOrderId = $nextOrder->mrd_order_id;
-                $nextOrderDelivPrice = ($nextOrder->mrd_order_total_price) + $deliveryCommission;
 
-                $userCreditUpdated = DB::table('mrd_user')
-                    ->where('mrd_user_id', $userId)
-                    ->value('mrd_user_credit');
+                //COLLECT DATA
+                $userCreditUpdated = CreditService::userCredit(
+                    $userId
+                );
+
+                $perMealPrice = SettingsService::perMealPrice();
+
+                $mealboxExtra = $MealboxService->mealboxExtra($nextOrder->mrd_order_user_id,  $nextOrder->mrd_order_quantity);
+
+                $mealboxExtraPrice = $MealboxService->mealboxExtraPrice($mealboxExtra);
+
+                $delivComm = $nextOrder->mrd_order_deliv_commission;
+
+                $nextOrderId = $nextOrder->mrd_order_id;
+                $nextOrderQuantity = $nextOrder->mrd_order_quantity;
+
+                //NEXT ORDER TOTAL PRICE
+
+                $nextOrderTotalPrice =  ($nextOrderQuantity * $perMealPrice) +  $mealboxExtraPrice +   $delivComm;
+
 
 
                 if (
-                    $userCreditUpdated >= $nextOrderDelivPrice
+                    $userCreditUpdated >= $nextOrderTotalPrice
                 ) {
                     //$userCreditUpdatedNew = $userCreditUpdated - $nextOrderTotalPrice;
                     $cash_to_get = 0;
                 } else {
                     // $userCreditUpdatedNew = 0;
-                    $cash_to_get = $nextOrderDelivPrice - $userCreditUpdated;
+                    $cash_to_get = $nextOrderTotalPrice - $userCreditUpdated;
                 }
+
+                // $cash_to_get = $CreditService->cashToGet($userId, $quantity);
+
+                $totalPrice = $CreditService->totalPrice($userId, $quantity);
 
                 //CASH TO GET UPDATE
                 $cashToGet = DB::table('mrd_order')
                     ->where('mrd_order_id', $nextOrderId)
-                    ->update(['mrd_order_cash_to_get' => $cash_to_get]);
+                    ->update([
+                        'mrd_order_cash_to_get' => $cash_to_get,
+                        'mrd_order_total_price' => $nextOrderTotalPrice,
+                        'mrd_order_mealbox_extra' =>  $mealboxExtra
+                    ]);
+
+                // $updatedRows = OrderService::orderUpdate(
+                //     $userId, //userId
+                //     $menuId, //menuId
+                //     $date,
+                //     null,              // $orderFor= food, item
+                //     null,               // Order type = default, custom
+                //     null,               //Qty
+                //     null,               // $orderStatus
+                //     null,              // $orderPayStatus
+                //     null,              // $orderRating
+                //     null,              // $orderFeedback
+                //     $MealboxService,
+                //     $CreditService
+                // );
+
+                //UPDATE NOTIFICATION
+                NotifService::notifUpdate($userId, $nextOrderId, null, 'order', null, null, $mealboxExtra, $cash_to_get,  null);
             }
         }
         //DELIVERED END
@@ -487,7 +622,7 @@ class DeliveryController extends Controller
             'userCredit' => $userCredit,
             // 'nextOrderTotalPrice' => $nextOrderTotalPrice,
             // 'subtotal' => $subtotal,
-            'notif' => $notif_message,
+            'notif' => $notifMessage,
             'delivStatus' => $delivStatus,
             'orderId' => $orderId,
             'userId' => $userId,

@@ -21,7 +21,7 @@ class MealboxController extends Controller
 
 
 
-    //MARK: Mealbox Switch
+    //MARK: MEALBOX SWTICH
     public function mealboxSwitch(Request $request)
     {
 
@@ -29,6 +29,8 @@ class MealboxController extends Controller
         $TFLoginToken = $request->input("TFLoginToken");
 
         $NotifService = new NotifService();
+        $MealboxService = new MealboxService();
+        $CreditService = new CreditService();
 
         $userId = DB::table('mrd_user')
             ->where('mrd_user_session_token', $TFLoginToken)
@@ -45,6 +47,8 @@ class MealboxController extends Controller
 
 
         // Get the current date
+
+        //UPDATE MEALBOX STATUS FOR NEXT ORDER IF TURNED ON/OFF
         $today = Carbon::today()->toDateString();
 
         $lunchLimit = DB::table('mrd_setting')->value('mrd_setting_time_limit_lunch');
@@ -58,41 +62,137 @@ class MealboxController extends Controller
         $currentDateTime = now()->format('Y-m-d H:i:s');
         $currentDate = now()->format('Y-m-d');
 
-        if ($currentDateTime < $lunchLimitDateTime) {
+        //get swtich value
+        //if swich value is true, get mealboxGive, set mrd_order_mealbox = quantity
 
-            DB::table('mrd_order')
-                ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
-                ->whereDate('mrd_order.mrd_order_date', $currentDate)
-                ->where('mrd_menu.mrd_menu_period', 'lunch')
-                ->where('mrd_order.mrd_order_user_id', $userId)
-                ->update([
-                    'mrd_order.mrd_order_mealbox' => $switchValue
-                ]);
+        // $MealboxService->mealboxGive($userId, $quantity);
+
+
+        // $orderId = DB::table('mrd_order')
+        //     ->where('mrd_order_user_id', $userId)
+        //     ->where('mrd_menu_period', 'lunch')
+        //     ->where('mrd_order_date', $currentDate)
+        //     ->value('mrd_order_id');
+
+        // $quantity = DB::table('mrd_order')
+        //     ->where('mrd_order_user_id', $userId)
+        //     ->where('mrd_menu_period', 'lunch')
+        //     ->where('mrd_order_date', $currentDate)
+        //     ->value('mrd_order_quantity');
+
+
+        // if ($currentDateTime < $lunchLimitDateTime) {
+
+        //     DB::table('mrd_order')
+        //         ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+        //         ->where('mrd_order.mrd_order_id', $orderId)
+        //         ->update([
+        //             'mrd_order.mrd_order_mealbox' => $MealboxService->mealboxGive($userId, $quantity)
+        //         ]);
+        // }
+
+
+        // if ($currentDateTime < $dinnerLimitDateTime) {
+
+        //     DB::table('mrd_order')
+        //         ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+        //         ->where('mrd_order.mrd_order_id', $orderId)
+        //         ->update([
+        //             'mrd_order.mrd_order_mealbox' => $MealboxService->mealboxGive($userId, $quantity)
+        //         ]);
+        // }
+
+        // $update = DB::table('mrd_order')
+        //     ->where('mrd_order_user_id', $userId)
+        //     ->whereDate('mrd_order_date', '>', $today)
+        //     ->update(['mrd_order_mealbox' => $switchValue]);
+
+
+        //UPDATE MEALBOX DETAILS IN ORDER TABLE
+        function updateMealbox($userId, $currentDate, $mealPeriod, $cutoffTime, $MealboxService, $currentDateTime)
+        {
+            if ($currentDateTime < $cutoffTime) {
+                $order = DB::table('mrd_order')
+                    ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
+                    ->where('mrd_order_user_id', $userId)
+                    ->where('mrd_menu.mrd_menu_period', $mealPeriod)
+                    ->where('mrd_order_date', $currentDate)
+                    ->select('mrd_order.mrd_order_id', 'mrd_order.mrd_order_quantity')
+                    ->first();
+
+                if ($order) {
+                    DB::table('mrd_order')
+                        ->where('mrd_order_id', $order->mrd_order_id)
+                        ->update([
+                            'mrd_order_mealbox' => $MealboxService->mealboxGive($userId, $order->mrd_order_quantity),
+                            'mrd_order_mealbox_extra' => $MealboxService->mealboxExtra($userId, $order->mrd_order_quantity)
+                        ]);
+                }
+            }
         }
 
 
-        if ($currentDateTime < $dinnerLimitDateTime) {
-
-            DB::table('mrd_order')
-                ->join('mrd_menu', 'mrd_order.mrd_order_menu_id', '=', 'mrd_menu.mrd_menu_id')
-                ->whereDate('mrd_order.mrd_order_date', $currentDate)
-                ->where('mrd_menu.mrd_menu_period', 'dinner')
-                ->where('mrd_order.mrd_order_user_id', $userId)
-                ->update([
-                    'mrd_order.mrd_order_mealbox' => $switchValue
-                ]);
-        }
-
-        $update = DB::table('mrd_order')
-            ->where('mrd_order_user_id', $userId)
-            ->whereDate('mrd_order_date', '>', $today)
-            ->update(['mrd_order_mealbox' => $switchValue]);
+        updateMealbox($userId, $currentDate, 'lunch', $lunchLimitDateTime, $MealboxService, $currentDateTime);
+        updateMealbox($userId, $currentDate, 'dinner', $dinnerLimitDateTime, $MealboxService, $currentDateTime);
 
 
+
+        //MARK: INSERT NOTIF
         $NotifService->notifMealbox($userId, $switchValue);
 
 
-        return ResponseService::success('Mealbox Switch Triggered.');
+
+
+        //GET NOTIF ID OF THE LATEST PENDING ORDER FROM NOW
+        $notifData = DB::table('mrd_notification')
+            ->join('mrd_order', 'mrd_notification.mrd_notif_order_id', '=', 'mrd_order.mrd_order_id')
+            ->where('mrd_notification.mrd_notif_user_id', $userId)
+            ->where('mrd_notification.mrd_notif_type', 'order')
+            ->where('mrd_order.mrd_order_status', 'pending')
+            ->where('mrd_order.mrd_order_date', '>=', now()->toDateString())
+            ->orderBy('mrd_notification.mrd_notif_date_added')
+            ->select('mrd_notification.mrd_notif_id', 'mrd_notification.mrd_notif_order_id', 'mrd_order.mrd_order_quantity')
+            ->first();
+
+
+
+        if ($notifData) {
+
+            $notifId = $notifData->mrd_notif_id;
+            $orderId = $notifData->mrd_notif_order_id;
+            $quantity = $notifData->mrd_order_quantity;
+
+
+            //UPDATE ORDER DETAILS
+            DB::table('mrd_order')
+                // ->where('mrd_order_menu_id', $menuId)
+                ->where('mrd_order_id', $orderId)
+                ->update([
+                    'mrd_order_mealbox' =>  $MealboxService->mealboxGive($userId,  $quantity),
+                    'mrd_order_mealbox_extra' => $MealboxService->mealboxExtra($userId, $quantity),
+                    'mrd_order_total_price' => $CreditService->totalPrice($userId, $quantity),
+                    'mrd_order_cash_to_get' => $CreditService->cashToGet($userId, $quantity)
+                ]);
+
+
+
+            // NOTIFCATION UPDATE FOR PRICE AND MEALBOX EXTRA
+            $updateNotif = DB::table('mrd_notification')
+                ->where('mrd_notif_id', $notifId)
+                // ->orderBy('mrd_notif_date_added', 'desc') // Assuming you have a 'created_at' column for determining the most recent
+                ->update([
+                    'mrd_notif_total_price' => $CreditService->totalPrice($userId, $quantity),
+                    'mrd_notif_mealbox_extra' => $MealboxService->mealboxExtra($userId, $quantity),
+                ]);
+        }
+
+
+
+
+
+
+
+        return ResponseService::success("Mealbox Switch Triggered.");
 
         // return ResponseService::success('Mealbox Switch Triggered.', [
         //     'currentTime' => $currentDateTime,

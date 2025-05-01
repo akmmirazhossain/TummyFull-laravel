@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
+use App\Services\CreditService;
+use App\Services\MealboxService;
+use App\Services\NotifService;
+use App\Services\PaymentService;
+use App\Services\SettingsService;
+use App\Services\OrderService;
+
+
 class SmsController extends Controller
 {
     //MARK: USER FETCH
@@ -182,6 +190,7 @@ class SmsController extends Controller
                 ->where('mrd_payment_type', 'discount')
                 ->exists();
 
+
             echo $userId . ", Lastest order: " . $latestOrderId . ", Has discount: " . $hasDiscount . "</br>";
 
             if (!$hasDiscount) {
@@ -209,17 +218,22 @@ class SmsController extends Controller
                 echo 'after message compose <br><br>';
 
                 // Insert discount record in mrd_payment
-                DB::table('mrd_payment')->insert([
-                    'mrd_payment_status' => 'paid', // Considered as paid since it's a discount
-                    'mrd_payment_amount' => intval($discountAmount),
-                    'mrd_payment_user_id' => $userId,
-                    'mrd_payment_order_id' => $latestOrderId,
-                    'mrd_payment_for' => 'order', // Since it's for meal orders
-                    'mrd_payment_method' => 'system', // Since the system is applying the discount
-                    'mrd_payment_type' => 'discount', // Marked as discount
-                    'mrd_payment_message' => 'New user',
-                    'mrd_payment_date_paid' => now(), // Timestamp of the discount application
-                ]);
+
+
+                PaymentService::paymentInsert(
+                    $userId,
+                    $latestOrderId,
+                    intval($discountAmount),
+                    'new_user',
+                    'paid',
+                    'discount',
+                    null,
+                    'system',
+                    null,
+                    null,
+                    null,
+                    now()
+                );
 
                 // Insert notification for the user
                 DB::table('mrd_notification')->insert([

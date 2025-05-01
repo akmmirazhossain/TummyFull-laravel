@@ -49,6 +49,7 @@ class UserController extends Controller
                 'mrd_user_mealbox' => $user->mrd_user_mealbox,
                 'mrd_user_mealbox_paid' => $user->mrd_user_mealbox_paid,
                 'mrd_user_has_mealbox' => $user->mrd_user_has_mealbox,
+                'mrd_user_order_delivered' => $user->mrd_user_order_delivered,
                 'mrd_user_credit' => $user->mrd_user_credit,
                 'delivery_instruction' => $user->mrd_user_delivery_instruction, // Assuming this maps correctly to 'delivery_message'
                 'meal_size' => $user->mrd_user_meal_size,

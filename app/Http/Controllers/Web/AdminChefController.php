@@ -104,7 +104,7 @@ class AdminChefController extends Controller
             'mrd_payment_user_id' => $chef_id,
             'mrd_payment_order_id' => $orderIdString,
             'mrd_payment_order_quantity' => $total_quantity,
-            'mrd_payment_for' => 'chef',
+            'mrd_payment_action' => 'chef',
             'mrd_payment_method' => $paymentMethod,
             'mrd_payment_date_paid' => now(), // Assuming you want to record the current date and time
         ]);
@@ -139,46 +139,5 @@ class AdminChefController extends Controller
     ");
 
         return view('chef_list', ['chefs' => $chefs]);
-    }
-
-
-
-
-    public function chef_payment_history(Request $request)
-    {
-        $payments = DB::select("
-        SELECT 
-            payment.mrd_payment_id,
-            payment.mrd_payment_status,
-            payment.mrd_payment_amount,
-            payment.mrd_payment_user_id,
-            payment.mrd_payment_order_id,
-            payment.mrd_payment_order_quantity,
-            payment.mrd_payment_for,
-            payment.mrd_payment_collector_id,
-            payment.mrd_payment_discount,
-            payment.mrd_payment_method,
-            payment.mrd_payment_message,
-            payment.mrd_payment_date_paid,
-            user.mrd_user_first_name,
-            LENGTH(payment.mrd_payment_order_id) - LENGTH(REPLACE(payment.mrd_payment_order_id, ',', '')) + 1 AS order_count
-        FROM 
-            mrd_payment AS payment
-        JOIN 
-            mrd_user AS user
-        ON 
-            payment.mrd_payment_user_id = user.mrd_user_id
-        WHERE 
-            payment.mrd_payment_for = 'chef'
-        ORDER BY 
-            payment.mrd_payment_date_paid DESC
-    ");
-
-        // Format the date
-        foreach ($payments as $payment) {
-            $payment->formatted_date_paid = Carbon::parse($payment->mrd_payment_date_paid)->format('jS M Y, h:i A');
-        }
-
-        return view('chef_payment_history', ['payments' => $payments]);
     }
 }
